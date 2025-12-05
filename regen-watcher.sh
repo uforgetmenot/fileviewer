@@ -6,6 +6,7 @@ TARGET_DIR=${TARGET_DIR:-$WATCH_DIR}
 GENERATE_SCRIPT=${GENERATE_SCRIPT:-$WATCH_DIR/generate.py}
 TEMPLATE_DIR=${TEMPLATE_DIR:-/opt/template}
 SUPPORTED_PATTERN='\.(png|jpg|jpeg|gif|webp|md|drawio|pdf|xlsx|docx|txt|pptx)$'
+SITE_NAME=${SITE_NAME:-文件浏览器}
 
 if [[ ! -d "$WATCH_DIR" ]]; then
   echo "监控目录不存在: $WATCH_DIR" >&2
@@ -30,7 +31,32 @@ seed_default_content() {
   done
 }
 
+configure_site_name() {
+  local target_file="$WATCH_DIR/index.html"
+  [[ -f "$target_file" ]] || return
+
+  python3 - "$target_file" "$SITE_NAME" <<'PY'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+site_name = sys.argv[2]
+text = path.read_text(encoding="utf-8")
+
+title_pattern = re.compile(r"(<title>)(.*?)(</title>)", re.S)
+brand_pattern = re.compile(r'(<a[^>]*class="header__brand"[^>]*>\s*(?:<svg.*?</svg>\s*))([^<]+)', re.S)
+
+updated = title_pattern.sub(lambda m: f"{m.group(1)}{site_name}{m.group(3)}", text, count=1)
+updated = brand_pattern.sub(lambda m: f"{m.group(1)}{site_name}", updated, count=1)
+
+if updated != text:
+    path.write_text(updated, encoding="utf-8")
+PY
+}
+
 seed_default_content
+configure_site_name
 
 if [[ ! -f "$GENERATE_SCRIPT" ]]; then
   echo "未找到 generate.py: $GENERATE_SCRIPT" >&2

@@ -8,5 +8,12 @@ services:
     working_dir: /workspace
     environment:
       - WATCH_DIR=/workspace
+      - SITE_NAME=${SITE_NAME:-文件浏览器}
     restart: unless-stopped
     tty: true
+    networks:
+      - virtualink
+
+networks:
+  virtualink:
+    external: true
