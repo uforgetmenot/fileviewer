@@ -1,0 +1,2670 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>文件浏览器</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Library Styles -->
+  <link rel="stylesheet" href="assets/docx-preview.min.css" />
+  <link rel="stylesheet" href="assets/xspreadsheet.css" />
+  <link rel="stylesheet" href="assets/pptxjs.css" />
+  <link rel="stylesheet" href="assets/nv.d3.min.css" />
+  <link rel="stylesheet" href="assets/highlight-github.min.css" />
+  <link rel="stylesheet" href="assets/marpit-default.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.1.0/github-markdown.css">
+</head>
+<body>
+
+  <header class="header">
+    <div class="header__container">
+      <a href="#" class="header__brand">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        文件浏览器
+      </a>
+      <button id="menuToggle" class="header__toggle" aria-label="Toggle menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      <nav id="categoryFilters" class="header__nav nav__list"></nav>
+    </div>
+  </header>
+
+  <main class="main">
+    <aside class="sidebar">
+      <div class="sidebar__header">
+        <h2 style="font-size: 0.875rem; margin-bottom: 0.5rem;">目录树</h2>
+        <div class="input-group">
+          <input id="treeSearchInput" type="text" class="input" placeholder="搜索文件..." />
+          <button id="treeSearchClear" type="button" class="input-icon hidden" style="background:none; border:none;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        <div id="treeMeta" class="text-xs text-muted mt-2"></div>
+      </div>
+      <div id="treeContainer" class="sidebar__content tree-container"></div>
+    </aside>
+
+    <section class="preview">
+      <div class="fullscreen-trigger"></div>
+      <button id="mainSidebarToggle" class="sidebar-toggle" title="切换目录栏">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+      </button>
+      <div class="preview__header">
+        <div class="flex-col" style="margin-left: 2.5rem;"> <!-- Added margin for toggle button -->
+          <h2 id="previewTitle" style="font-size: 0.875rem;">请选择文件</h2>
+          <p id="previewSubtitle" class="text-xs text-muted">在左侧树中选择任意文件，即可在此预览。</p>
+        </div>
+        <div class="flex-row gap-2" style="display: flex;">
+          <button id="prevBtn" class="btn btn--ghost btn-sm" title="上一项">↑</button>
+          <button id="nextBtn" class="btn btn--ghost btn-sm" title="下一项">↓</button>
+          
+          <button id="toggleFullscreenBtn" type="button" class="btn btn--primary btn-sm" aria-label="全屏显示">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3m-18 0v3a2 2 0 0 0 2 2h3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="preview__content">
+        <div id="imagePreviewWrapper" class="image-preview hidden">
+          <figure id="zoomContainer" class="image-canvas">
+            <img id="singleImage" src="" alt="当前图片" class="single-image">
+          </figure>
+          <p class="text-xs text-muted" style="text-align: right; margin-top: 0.5rem;">滚轮缩放 · 拖拽平移 · 双击重置</p>
+        </div>
+        <div id="docPreview" class="w-full h-full"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="assets/marked.min.js"></script>
+  <script src="assets/highlight.min.js"></script>
+  <script src="assets/jszip.min.js"></script>
+  <script src="assets/docx-preview.min.js"></script>
+  <script src="assets/xlsx.full.min.js"></script>
+  <script src="assets/xspreadsheet.js"></script>
+  <script src="assets/jquery-1.11.3.min.js"></script>
+  <script src="assets/filereader.js"></script>
+  <script src="assets/d3.v7.min.js"></script>
+  <script src="assets/markmap-lib.min.js"></script>
+  <script src="assets/markmap.min.js"></script>
+  <script>
+    window.markmap = window.markmap || {};
+    window.markmap.autoLoader = Object.assign({}, window.markmap.autoLoader, {
+      manual: true,
+      baseJs: [],
+      baseCss: [],
+      provider: 'jsdelivr',
+    });
+  </script>
+  <script src="assets/markmap-autoloader.min.js"></script>
+  <script src="assets/drawio-viewer.min.js"></script>
+  <script src="assets/d3.v3.min.js"></script>
+  <script src="assets/nv.d3.min.js"></script>
+  <script src="assets/dingbat.js"></script>
+  <script src="assets/pptxjs.js"></script>
+  <script src="assets/divs2slides.js"></script>
+  <script src="assets/marpit.min.js"></script>
+
+  <script>
+    // Mobile Menu Toggle
+    const menuToggle = document.getElementById('menuToggle');
+    const headerNav = document.getElementById('categoryFilters');
+    const mainSidebarToggle = document.getElementById('mainSidebarToggle');
+    const mainContainer = document.querySelector('.main');
+
+    if (mainSidebarToggle && mainContainer) {
+      mainSidebarToggle.addEventListener('click', () => {
+        mainContainer.classList.toggle('sidebar-collapsed');
+      });
+    }
+
+    if (menuToggle && headerNav) {
+      menuToggle.addEventListener('click', () => {
+        headerNav.classList.toggle('is-open');
+      });
+    }
+
+    const INDEX_JSON = 'index.json';
+    const CATEGORY_CONFIG = {
+      images: { label: '图片', helper: '缩略图浏览' },
+      markdown: { label: 'MD', helper: '渲染 Markdown' },
+      mindmap: { label: '思维导图', helper: 'Markmap' },
+      drawio: { label: 'Draw.io', helper: '图表预览' },
+      marpit: { label: 'PPT(MD)', helper: 'Marpit 演示' },
+      pdf: { label: 'PDF', helper: 'PDF 预览' },
+      word: { label: 'Word', helper: 'Docx 渲染' },
+      excel: { label: 'Excel', helper: 'Spreadsheet' },
+      text: { label: 'TXT', helper: '文本预览' },
+      slides: { label: 'PPTX', helper: '幻灯片' },
+    };
+    const CATEGORY_ORDER = Object.keys(CATEGORY_CONFIG);
+
+    const MARPIT_CUSTOM_STYLE = `
+      .marpit-wrapper {
+        background-color: #e5e7eb;
+        padding: 30px; /* Reduced padding */
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-width: fit-content;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .marpit-wrapper section {
+        background-color: #ffffff;
+        background-image: radial-gradient(circle at top, rgba(255,255,255,0.95), rgba(248,249,250,0.9));
+        border: 1px solid rgba(15,23,42,0.08);
+        border-radius: 6px;
+        flex-shrink: 0;
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18), 0 4px 10px rgba(15, 23, 42, 0.1);
+        padding: 80px 100px; /* Increased padding for larger slides */
+        width: 100%;
+        max-width: 1024px; /* Increased max-width for better space utilization */
+        aspect-ratio: 4 / 3; /* Maintain aspect ratio (1024/768 = 4/3) */
+        min-height: auto;
+        margin: 10px auto;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+        color: #24292f;
+        font-size: 16px;
+        line-height: 1.6;
+        position: relative;
+      }
+      
+      /* GitHub Theme Elements */
+      .marpit-wrapper h1 {
+        border-bottom: 1px solid #d0d7de;
+        padding-bottom: 0.3em;
+        font-size: 36px;
+        font-weight: 600;
+        margin-bottom: 1.2rem; /* Adjusted margin */
+        margin-top: 0;
+        color: #1F2328;
+      }
+      .marpit-wrapper h2 {
+        border-bottom: 1px solid #d0d7de;
+        padding-bottom: 0.3em;
+        font-size: 25px;
+        font-weight: 600;
+        margin-top: 1.8rem; /* Adjusted margin */
+        margin-bottom: 1.2rem; /* Adjusted margin */
+        color: #1F2328;
+      }
+      .marpit-wrapper h3 { font-size: 24px; font-weight: 600; margin-top: 1.1em; margin-bottom: 0.65em; color: #1F2328; }
+      .marpit-wrapper h4 { font-size: 23px; font-weight: 600; color: #1F2328; }
+      .marpit-wrapper h5 { font-size: 22px; font-weight: 600; color: #1F2328; }
+      .marpit-wrapper h6 { font-size: 21px; font-weight: 600; color: #1F2328; letter-spacing: 0.02em; }
+      .marpit-wrapper h7,
+      .marpit-wrapper h8,
+      .marpit-wrapper h9 {
+        font-size: 20px;
+        font-weight: 600;
+        color: #1F2328;
+      }
+      
+      .marpit-wrapper pre {
+        background-color: #f6f8fa;
+        border-radius: 6px;
+        padding: 16px;
+        overflow: auto;
+      }
+      .marpit-wrapper code {
+        font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+        font-size: 0.85em;
+      }
+      .marpit-wrapper blockquote {
+        border-left: 0.25em solid #d0d7de;
+        color: #57606a;
+        padding: 0 1em;
+        margin: 1.2em 0; /* Adjusted margin */
+      }
+      
+      .marpit-wrapper ul,
+      .marpit-wrapper ol { padding-left: 2em; }
+      .marpit-wrapper li { margin-bottom: 0.6em; } /* Adjusted margin */
+      .marpit-wrapper img { max-width: 100%; height: auto; display: block; margin: 1.2rem auto; } /* Adjusted margin */
+      .marpit-wrapper table { border-collapse: collapse; width: 100%; margin: 1.2rem 0; } /* Adjusted margin */
+      .marpit-wrapper th,
+      .marpit-wrapper td { border: 1px solid #d0d7de; padding: 6px 13px; }
+      .marpit-wrapper th { background-color: #f6f8fa; font-weight: 600; }
+      .marpit-wrapper tr:nth-child(2n) { background-color: #f6f8fa; }
+    `;
+
+    let fileGroups = [];
+    let filteredFiles = [];
+    let currentCategory = 'all';
+    let currentIndex = 0;
+    let treeSearchTerm = '';
+    let zoomLevel = 1;
+    let translateX = 0;
+    let translateY = 0;
+    const MIN_ZOOM = 0.1;
+    const MAX_ZOOM = 10;
+    const DRAWIO_PAN_CANVAS_SIZE = 3200;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let disposePptxViewer = null;
+    let marpitInstance = null;
+    let disposeDrawioPanSurface = null;
+    let resetDrawioPanPosition = null;
+    let disposeMarpitNavigation = null;
+    let disposePdfViewer = null;
+    let disposeWordToc = null;
+    let currentWordHeadingStyles = null;
+    const DOCX_STYLE_PREFIX = 'docx';
+
+    // Elements
+    const categoryFiltersEl = document.getElementById('categoryFilters');
+    const treeContainer = document.getElementById('treeContainer');
+    const treeSearchInput = document.getElementById('treeSearchInput');
+    const treeSearchClear = document.getElementById('treeSearchClear');
+    const treeMetaEl = document.getElementById('treeMeta');
+    const previewTitleEl = document.getElementById('previewTitle');
+    const previewSubtitleEl = document.getElementById('previewSubtitle');
+    const docPreviewEl = document.getElementById('docPreview');
+    const imagePreviewWrapper = document.getElementById('imagePreviewWrapper');
+    const zoomContainer = document.getElementById('zoomContainer');
+    const singleImage = document.getElementById('singleImage');
+    const toggleFullscreenBtn = document.getElementById('toggleFullscreenBtn');
+
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const previewCardEl = document.querySelector('.preview');
+    const rootStyle = document.documentElement.style;
+
+    // Updated Class Names for Icons (no 'file-' prefix as per CSS)
+    const FILE_TYPE_ICON_MAP = {
+      images: { className: 'icon-images', paths: [{ d: 'm2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z' }] },
+      markdown: { className: 'icon-markdown', paths: [{ d: 'M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5' }] },
+      drawio: { className: 'icon-default', paths: [{ d: 'M4 7h16v10H4z' }, { d: 'M4 7 12 4l8 3' }] }, 
+      pdf: { className: 'icon-pdf', paths: [{ d: 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z' }] },
+      word: { className: 'icon-word', paths: [{ d: 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z' }] },
+      excel: { className: 'icon-excel', paths: [{ d: 'M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h7.5' }] }, 
+      text: { className: 'icon-default', paths: [{ d: 'M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12' }] },
+      slides: { className: 'icon-slides', paths: [{ d: 'M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25' }] }, 
+      default: { className: 'icon-generic', paths: [{ d: 'M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z' }] },
+    };
+    
+    const FOLDER_ICON = {
+      paths: [{ d: 'M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776' }]
+    };
+
+    const scriptLoadingCache = new Map();
+    function loadExternalScript(src) {
+      if (!src) return Promise.reject(new Error('缺少脚本地址'));
+      if (scriptLoadingCache.has(src)) return scriptLoadingCache.get(src);
+      const promise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`脚本加载失败: ${src}`));
+        document.head.appendChild(script);
+      });
+      scriptLoadingCache.set(src, promise);
+      return promise;
+    }
+
+    const PDFJS_SRC = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+    const PDFJS_WORKER_SRC = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    let pdfjsReadyPromise = null;
+    async function ensurePdfJs() {
+      if (window.pdfjsLib) {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
+        return window.pdfjsLib;
+      }
+      if (!pdfjsReadyPromise) {
+        pdfjsReadyPromise = loadExternalScript(PDFJS_SRC).then(() => {
+          if (!window.pdfjsLib) throw new Error('PDF.js 加载失败');
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_SRC;
+          return window.pdfjsLib;
+        });
+      }
+      return pdfjsReadyPromise;
+    }
+
+    const NAME_COLLATOR = (typeof Intl !== 'undefined' && typeof Intl.Collator === 'function')
+      ? new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' })
+      : null;
+
+    function getFileName(path) {
+      if (!path) return '';
+      const parts = path.split('/');
+      return parts[parts.length - 1] || path;
+    }
+    function escapeHtml(text) {
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function getCategoryLabel(type) {
+      if (type === 'all') return '全部';
+      return CATEGORY_CONFIG[type]?.label || type;
+    }
+    function compareNames(a, b) {
+      if (NAME_COLLATOR) return NAME_COLLATOR.compare(a || '', b || '');
+      return (a || '').localeCompare(b || '');
+    }
+
+    function renderCategoryFilters() {
+      if (!categoryFiltersEl) return;
+      const totals = { all: 0 };
+      fileGroups.forEach(g => {
+        Object.entries(g?.categories || {}).forEach(([t, f]) => {
+          totals[t] = (totals[t] || 0) + f.length;
+          totals.all += f.length;
+        });
+      });
+      
+      const filters = ['all', ...CATEGORY_ORDER];
+      categoryFiltersEl.innerHTML = '';
+      filters.forEach((type) => {
+        const count = type === 'all' ? totals.all : (totals[type] || 0);
+        const button = document.createElement('button');
+        button.className = 'nav__item';
+        if (type === currentCategory) button.classList.add('nav__item--active');
+        button.textContent = `${getCategoryLabel(type)} (${count})`;
+        if (type !== 'all' && !count) {
+          button.disabled = true;
+        } else {
+          button.addEventListener('click', () => {
+             if (currentCategory === type) return;
+             currentCategory = type;
+             currentIndex = 0;
+             renderCategoryFilters();
+             renderTree();
+             if (filteredFiles.length) setCurrentFile(0);
+             else showPreviewPlaceholder('当前筛选没有匹配文件。');
+             
+             if (window.innerWidth < 768) {
+                document.getElementById('categoryFilters').classList.remove('is-open');
+             }
+          });
+        }
+        categoryFiltersEl.appendChild(button);
+      });
+    }
+
+    function createSvgIcon(iconConfig) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('fill', 'none');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.setAttribute('stroke-width', 1.5);
+      (iconConfig.paths || []).forEach(p => {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', p.d);
+        svg.appendChild(path);
+      });
+      return svg;
+    }
+
+    function createDirectoryNode(node, level = 0) {
+      if (!node || !node.totalCount) return null;
+      const details = document.createElement('details');
+      details.className = 'tree__group';
+      details.open = level < 2;
+
+      const summary = document.createElement('summary');
+      summary.className = 'tree__summary';
+
+      const titleSpan = document.createElement('span');
+      titleSpan.style.display = 'flex';
+      titleSpan.style.alignItems = 'center';
+      titleSpan.style.gap = '0.5rem';
+      
+      const icon = document.createElement('span');
+      icon.className = 'tree__icon icon-folder';
+      icon.style.color = '#F59E0B';
+      icon.appendChild(createSvgIcon(FOLDER_ICON));
+      titleSpan.appendChild(icon);
+      
+      const text = document.createElement('span');
+      text.textContent = node.isRoot ? '当前目录' : node.name;
+      titleSpan.appendChild(text);
+      
+      const count = document.createElement('span');
+      count.className = 'tree__count';
+      count.textContent = node.totalCount;
+
+      summary.appendChild(titleSpan);
+      summary.appendChild(count);
+      details.appendChild(summary);
+
+      const childrenWrapper = document.createElement('div');
+      childrenWrapper.className = 'tree__children';
+      if (node.isRoot) childrenWrapper.classList.add('tree__children--root');
+
+      const sortedChildren = Array.from(node.children.values())
+        .filter(c => c.totalCount)
+        .sort((a, b) => compareNames(a.name, b.name));
+        
+      sortedChildren.forEach(child => {
+        const childNode = createDirectoryNode(child, level + 1);
+        if (childNode) childrenWrapper.appendChild(childNode);
+      });
+
+      if (node.files.length) {
+        const fileContent = document.createElement('div');
+        fileContent.className = 'tree__content';
+        const sortedFiles = [...node.files].sort((a, b) => compareNames(getFileName(a.path), getFileName(b.path)));
+        sortedFiles.forEach(entry => {
+           fileContent.appendChild(createFileItem(entry));
+        });
+        childrenWrapper.appendChild(fileContent);
+      }
+
+      details.appendChild(childrenWrapper);
+      return details;
+    }
+
+    function createFileItem(entry) {
+      const entryIndex = filteredFiles.length;
+      filteredFiles.push(entry);
+      const item = document.createElement('button');
+      item.className = 'tree__item';
+      item.dataset.index = entryIndex;
+      if (entryIndex === currentIndex) item.classList.add('tree__item--active');
+
+      const iconConfig = FILE_TYPE_ICON_MAP[entry.type] || FILE_TYPE_ICON_MAP.default;
+      const iconSpan = document.createElement('span');
+      iconSpan.className = `tree__icon ${iconConfig.className}`;
+      iconSpan.appendChild(createSvgIcon(iconConfig));
+      
+      const textSpan = document.createElement('span');
+      textSpan.className = 'tree__text';
+      textSpan.textContent = getFileName(entry.path);
+      textSpan.title = getFileName(entry.path);
+
+      item.appendChild(iconSpan);
+      item.appendChild(textSpan);
+      
+      item.addEventListener('click', () => setCurrentFile(entryIndex));
+      return item;
+    }
+
+    function buildDirectoryTree(entries) {
+      const createNode = (name, path, isRoot = false) => ({
+        name, path, children: new Map(), files: [], totalCount: 0, isRoot
+      });
+      const root = createNode('Root', '.', true);
+      entries.forEach(entry => {
+         const normalized = (entry.path || '').replace(/^\.\/+/, '');
+         const segments = normalized ? normalized.split('/').filter(Boolean) : [];
+         if (!segments.length) { root.files.push(entry); return; }
+         
+         let current = root;
+         const dirs = segments.slice(0, segments.length - 1);
+         dirs.forEach(dir => {
+            if (!current.children.has(dir)) {
+              current.children.set(dir, createNode(dir, current.path === '.' ? dir : `${current.path}/${dir}`));
+            }
+            current = current.children.get(dir);
+         });
+         current.files.push(entry);
+      });
+      
+      const compute = (node) => {
+        let total = node.files.length;
+        node.children.forEach(c => total += compute(c));
+        node.totalCount = total;
+        return total;
+      };
+      compute(root);
+      return root;
+    }
+
+    function renderTree() {
+      if (!treeContainer) return;
+      treeContainer.innerHTML = '';
+      filteredFiles = [];
+      const search = treeSearchTerm.trim().toLowerCase();
+      
+      const allEntries = [];
+      fileGroups.forEach((g, idx) => {
+        Object.entries(g?.categories || {}).forEach(([type, files]) => {
+           files.forEach(path => {
+             if (currentCategory !== 'all' && currentCategory !== type) return;
+             if (search) {
+                if (!path.toLowerCase().includes(search)) return;
+             }
+             allEntries.push({ path, type, groupIndex: idx });
+           });
+        });
+      });
+      
+      if (!allEntries.length) {
+        treeContainer.innerHTML = '<div style="padding:1rem; color:var(--color-text-muted); text-align:center;">无匹配文件</div>';
+        if (treeMetaEl) treeMetaEl.textContent = '无匹配文件';
+        return;
+      }
+      
+      const treeData = buildDirectoryTree(allEntries);
+      const rootNode = createDirectoryNode(treeData, 0);
+      if (rootNode) treeContainer.appendChild(rootNode);
+      
+      if (currentIndex >= filteredFiles.length) currentIndex = 0;
+      updateTreeSelection();
+      if (treeMetaEl) treeMetaEl.textContent = `匹配 ${filteredFiles.length} 个文件`;
+    }
+
+    function updateTreeSelection() {
+      document.querySelectorAll('.tree__item').forEach(item => {
+         const idx = Number(item.dataset.index);
+         if (idx === currentIndex) {
+           item.classList.add('tree__item--active');
+           let parent = item.closest('details');
+           while(parent) {
+             parent.open = true;
+             parent = parent.parentElement ? parent.parentElement.closest('details') : null;
+           }
+           item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+         } else {
+           item.classList.remove('tree__item--active');
+         }
+      });
+    }
+
+    function setCurrentFile(index) {
+      if (!filteredFiles.length) return;
+      currentIndex = (index + filteredFiles.length) % filteredFiles.length;
+      updateTreeSelection();
+      const entry = filteredFiles[currentIndex];
+      if (entry) {
+         if (previewTitleEl) previewTitleEl.textContent = getFileName(entry.path);
+         if (previewSubtitleEl) previewSubtitleEl.textContent = `${getCategoryLabel(entry.type)} · ${entry.path}`;
+         
+         if (entry.type === 'images') showImagePreview(entry.path);
+         else showDocumentPreview(entry.path, entry.type);
+      }
+    }
+    
+    function slugify(text) {
+      return text
+        .toLowerCase()
+        .trim()
+        .replace(/[\s]+/g, '-')
+        .replace(/[^\w\-一-龥]+/g, '')
+        .replace(/--+/g, '-');
+    }
+
+    function buildMarkdownTocData(container) {
+      if (!container) return [];
+      const headings = Array.from(container.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+      if (!headings.length) return [];
+      
+      const slugCounts = new Map();
+      const entries = [];
+      
+      headings.forEach((heading) => {
+        const text = heading.textContent?.trim() || '';
+        if (!text) return;
+        const base = slugify(text) || `section-${entries.length + 1}`;
+        const count = slugCounts.get(base) || 0;
+        slugCounts.set(base, count + 1);
+        const slug = count ? `${base}-${count}` : base;
+        heading.id = slug;
+        const level = Number(heading.tagName.replace('H', ''));
+        entries.push({ slug, text, level });
+      });
+      return entries;
+    }
+
+    async function previewMarkdown(path) {
+       const text = await fetchText(path);
+       const html = window.marked ? window.marked.parse(text) : `<pre>${escapeHtml(text)}</pre>`;
+       
+       const parser = new DOMParser();
+       const parsed = parser.parseFromString(html, 'text/html');
+       
+       const tocEntries = buildMarkdownTocData(parsed.body);
+       const bodyHtml = parsed.body.innerHTML;
+
+       let sidebarHtml = '';
+       let toggleBtnHtml = '';
+       
+       if (tocEntries.length > 0) {
+         const listItems = tocEntries.map(entry => 
+            `<a href="#${entry.slug}" class="markdown-toc-item toc-level-${entry.level}" title="${escapeHtml(entry.text)}">${escapeHtml(entry.text)}</a>`
+         ).join('');
+         
+         sidebarHtml = `
+           <aside id="mdSidebar" class="markdown-sidebar collapsed"> <!-- Add 'collapsed' class -->
+             <div class="markdown-sidebar__header">
+               <span>目录</span>
+               <button id="closeMdSidebarBtn" class="btn btn--ghost btn-sm" style="padding: 4px;">✕</button>
+             </div>
+             <div class="markdown-sidebar__search">
+               <input type="text" id="mdTocSearch" class="input" placeholder="搜索目录..." style="padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+             </div>
+             <nav id="mdTocList" class="markdown-toc-list">
+               ${listItems}
+             </nav>
+           </aside>
+         `;
+         
+         toggleBtnHtml = `
+           <button id="mdSidebarToggle" class="markdown-floating-toggle" title="显示目录"> <!-- Remove 'hidden' class -->
+             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+           </button>
+         `;
+       }
+
+       docPreviewEl.innerHTML = `
+        <div class="markdown-wrapper">
+          ${sidebarHtml}
+          ${toggleBtnHtml}
+          <div class="markdown-content">
+            <article class="markdown-body">${bodyHtml}</article>
+          </div>
+        </div>
+       `;
+       
+       if (tocEntries.length > 0) {
+           const sidebar = document.getElementById('mdSidebar');
+           const toggleBtn = document.getElementById('mdSidebarToggle');
+           const closeBtn = document.getElementById('closeMdSidebarBtn');
+           const searchInput = document.getElementById('mdTocSearch');
+           
+           const toggleSidebar = () => {
+               sidebar.classList.toggle('collapsed');
+               toggleBtn.classList.toggle('hidden');
+           };
+           
+           if (toggleBtn) toggleBtn.addEventListener('click', toggleSidebar);
+           if (closeBtn) closeBtn.addEventListener('click', toggleSidebar);
+           
+           if (searchInput) {
+               searchInput.addEventListener('input', (e) => {
+                   const val = e.target.value.toLowerCase();
+                   const items = document.querySelectorAll('.markdown-toc-item');
+                   items.forEach(item => {
+                       const text = item.textContent.toLowerCase();
+                       item.style.display = text.includes(val) ? 'block' : 'none';
+                   });
+               });
+           }
+       }
+    }
+
+    function showImagePreview(path) {
+       cleanupDrawioPanHandlers();
+       cleanupMarpitNavigation();
+       cleanupPdfViewer();
+       imagePreviewWrapper.classList.remove('hidden');
+       docPreviewEl.classList.add('hidden');
+
+       singleImage.src = path;
+       resetZoom();
+    }
+
+    async function showDocumentPreview(path, type) {
+       imagePreviewWrapper.classList.add('hidden');
+       docPreviewEl.classList.remove('hidden');
+
+       cleanupDrawioPanHandlers();
+       cleanupPptxViewer();
+       cleanupMarpitNavigation();
+       cleanupPdfViewer();
+       cleanupWordToc();
+       cleanupExcelPreview();
+
+       showDocStatus('加载中...');
+       try {
+          if (type === 'markdown') await previewMarkdown(path);
+          else if (type === 'text') await previewText(path);
+          else if (type === 'mindmap') await previewMindmap(path);
+          else if (type === 'drawio') await previewDrawio(path);
+          else if (type === 'marpit') await previewMarpit(path);
+          else if (type === 'pdf') await previewPdf(path);
+          else if (type === 'word') await previewWord(path);
+          else if (type === 'excel') await previewExcel(path);
+          else if (type === 'slides') await previewSlides(path);
+          else showDocStatus('暂不支持预览');
+       } catch (e) {
+          showDocStatus('加载失败: ' + e.message);
+       }
+    }
+
+    function showDocStatus(msg) {
+       docPreviewEl.innerHTML = `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--color-text-muted);">${msg}</div>`;
+    }
+    function setExcelPreviewState(isActive) {
+      if (!docPreviewEl) return;
+      const previewContent = docPreviewEl.closest('.preview__content');
+      docPreviewEl.classList.toggle('excel-preview-active', !!isActive);
+      if (previewContent) {
+        previewContent.classList.toggle('excel-preview-active', !!isActive);
+      }
+    }
+    function cleanupExcelPreview() {
+      setExcelPreviewState(false);
+    }
+
+    const ROW_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5V19"/><polyline points="8 9 12 5 16 9"/><polyline points="8 15 12 19 16 15"/><rect x="5" y="9" width="14" height="6" rx="1.5"/></svg>`;
+    const COL_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12H19"/><polyline points="9 8 5 12 9 16"/><polyline points="15 8 19 12 15 16"/><rect x="9" y="5" width="6" height="14" rx="1.5"/></svg>`;
+    const TEXT_COLOR_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20H20"/><path d="M12 4L8 16H10.5L11.4 13H16.6L17.5 16H20L16 4H12Z"/></svg>`;
+    const FILL_COLOR_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4L20 8L12 16L4 8L8 4H16Z"/><path d="M12 16V20A2 2 0 0 0 14 22H18A2 2 0 0 0 20 20V16"/></svg>`;
+    const AUTO_ROW_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5H20"/><path d="M4 19H20"/><path d="M12 9V15"/><polyline points="9 11 12 8 15 11"/><polyline points="9 13 12 16 15 13"/></svg>`;
+    const AUTO_COL_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4V20"/><path d="M19 4V20"/><path d="M9 12H15"/><polyline points="11 9 8 12 11 15"/><polyline points="13 9 16 12 13 15"/></svg>`;
+    const AUTO_ALL_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 4V8"/><path d="M15 4V8"/><path d="M4 9H8"/><path d="M4 15H8"/><path d="M16 20V16"/><path d="M20 9H16"/><polyline points="9 12 12 9 15 12"/><polyline points="9 12 12 15 15 12"/></svg>`;
+    const SIZE_MODAL_DEFAULTS = { row: 28, col: 100 };
+    const COLOR_DEFAULTS = { text: '#1f2937', fill: '#ffffff' };
+    const AUTOFIT_SETTINGS = {
+      minColWidth: 60,
+      maxColWidth: 720,
+      minRowHeight: 24,
+      maxRowHeight: 420,
+      padding: 18,
+      lineHeight: 18,
+      defaultFont: 'normal 12px Arial',
+    };
+    let spreadsheetSizeModalInstance = null;
+    let spreadsheetMeasureCtx = null;
+
+    function applyUniformSize(xInstance, kind, value) {
+      const sheetData = xInstance?.sheet?.data;
+      if (!sheetData) return;
+      if (kind === 'row') {
+        const rows = sheetData.rows;
+        if (!rows || typeof rows.len !== 'number') return;
+        for (let i = 0; i < rows.len; i += 1) {
+          rows.setHeight(i, value);
+        }
+      } else {
+        const cols = sheetData.cols;
+        if (!cols || typeof cols.len !== 'number') return;
+        for (let i = 0; i < cols.len; i += 1) {
+          cols.setWidth(i, value);
+        }
+      }
+      if (typeof xInstance.reRender === 'function') {
+        xInstance.reRender();
+      }
+    }
+
+    function ensureMeasureContext() {
+      if (spreadsheetMeasureCtx) return spreadsheetMeasureCtx;
+      const canvas = document.createElement('canvas');
+      spreadsheetMeasureCtx = canvas.getContext('2d');
+      if (spreadsheetMeasureCtx) spreadsheetMeasureCtx.font = AUTOFIT_SETTINGS.defaultFont;
+      return spreadsheetMeasureCtx;
+    }
+
+    function measureTextWidth(text) {
+      if (!text) return 0;
+      const ctx = ensureMeasureContext();
+      if (!ctx) return text.length * 8;
+      if (ctx.font !== AUTOFIT_SETTINGS.defaultFont) {
+        ctx.font = AUTOFIT_SETTINGS.defaultFont;
+      }
+      const metrics = ctx.measureText(text);
+      return metrics?.width || text.length * 8;
+    }
+
+    function measureLongestLineWidth(text) {
+      if (!text) return 0;
+      return text
+        .split(/\r?\n/)
+        .map((line) => measureTextWidth(line))
+        .reduce((max, width) => (width > max ? width : max), 0);
+    }
+
+    function getCellDisplayText(cell) {
+      if (!cell) return '';
+      if (typeof cell.text === 'string') return cell.text;
+      if (cell.value === null || cell.value === undefined) return '';
+      if (typeof cell.value === 'object') {
+        if (typeof cell.value.text === 'string') return cell.value.text;
+        if (cell.value.v !== undefined) return String(cell.value.v);
+      }
+      return String(cell.value);
+    }
+
+    function getActiveSheetStructure(xInstance) {
+      if (!xInstance || typeof xInstance.getData !== 'function') return null;
+      const workbook = xInstance.getData();
+      if (!Array.isArray(workbook) || !workbook.length) return null;
+      const activeName = xInstance.sheet?.data?.name;
+      if (activeName) {
+        const match = workbook.find((sheet) => sheet.name === activeName);
+        if (match) return match;
+      }
+      return workbook[0];
+    }
+
+    function getColumnCount(sheetData, structure) {
+      if (typeof sheetData?.cols?.len === 'number') return sheetData.cols.len;
+      const structureCols = structure?.cols || {};
+      const indices = Object.keys(structureCols).map((key) => Number(key)).filter((num) => !Number.isNaN(num));
+      if (indices.length) return Math.max(...indices) + 1;
+      return 26;
+    }
+
+    function getColumnWidthEstimate(sheetData, structureCols, colIndex) {
+      if (typeof sheetData?.cols?.getWidth === 'function') {
+        const runtimeWidth = sheetData.cols.getWidth(colIndex);
+        if (Number.isFinite(runtimeWidth)) return runtimeWidth;
+      }
+      const structureWidth = structureCols?.[colIndex]?.width;
+      if (Number.isFinite(structureWidth)) return structureWidth;
+      return SIZE_MODAL_DEFAULTS.col;
+    }
+
+    function autoFitColumns(xInstance, options = {}) {
+      const sheetData = xInstance?.sheet?.data;
+      const structure = getActiveSheetStructure(xInstance);
+      if (!sheetData || !structure) return;
+      const rows = structure.rows || {};
+      const colCount = getColumnCount(sheetData, structure);
+      for (let ci = 0; ci < colCount; ci += 1) {
+        let widest = AUTOFIT_SETTINGS.minColWidth;
+        Object.values(rows).forEach((row) => {
+          const text = getCellDisplayText(row?.cells?.[ci]);
+          if (!text) return;
+          const width = measureLongestLineWidth(text);
+          if (width > widest) widest = width;
+        });
+        const padded = Math.min(
+          AUTOFIT_SETTINGS.maxColWidth,
+          Math.max(AUTOFIT_SETTINGS.minColWidth, Math.ceil(widest + AUTOFIT_SETTINGS.padding)),
+        );
+        if (typeof sheetData.cols?.setWidth === 'function') {
+          sheetData.cols.setWidth(ci, padded);
+        }
+      }
+      if (!options.skipRender && typeof xInstance.reRender === 'function') xInstance.reRender();
+    }
+
+    function autoFitRows(xInstance, options = {}) {
+      const sheetData = xInstance?.sheet?.data;
+      const structure = getActiveSheetStructure(xInstance);
+      if (!sheetData || !structure) return;
+      const rows = structure.rows || {};
+      const structureCols = structure.cols || {};
+      const defaultRowHeight = Number.isFinite(sheetData?.rows?.height) ? sheetData.rows.height : SIZE_MODAL_DEFAULTS.row;
+      Object.entries(rows).forEach(([rowKey, rowValue]) => {
+        const rowIndex = Number(rowKey);
+        if (Number.isNaN(rowIndex)) return;
+        const cells = rowValue?.cells || {};
+        let desiredHeight = defaultRowHeight;
+        Object.entries(cells).forEach(([colKey, cell]) => {
+          const ci = Number(colKey);
+          if (Number.isNaN(ci)) return;
+          const text = getCellDisplayText(cell);
+          if (!text) return;
+          const columnWidth = getColumnWidthEstimate(sheetData, structureCols, ci) - AUTOFIT_SETTINGS.padding;
+          const usableWidth = Math.max(12, columnWidth);
+          const widthBasedLines = Math.max(1, Math.ceil(measureLongestLineWidth(text) / usableWidth));
+          const newlineLines = text.split(/\r?\n/).length;
+          const totalLines = Math.max(widthBasedLines, newlineLines);
+          const cellHeight = Math.max(defaultRowHeight, totalLines * AUTOFIT_SETTINGS.lineHeight);
+          if (cellHeight > desiredHeight) desiredHeight = cellHeight;
+        });
+        if (typeof sheetData.rows?.setHeight === 'function') {
+          sheetData.rows.setHeight(
+            rowIndex,
+            Math.min(AUTOFIT_SETTINGS.maxRowHeight, Math.max(AUTOFIT_SETTINGS.minRowHeight, Math.ceil(desiredHeight))),
+          );
+        }
+      });
+      if (!options.skipRender && typeof xInstance.reRender === 'function') xInstance.reRender();
+    }
+
+    function autoFitAll(xInstance) {
+      autoFitRows(xInstance, { skipRender: true });
+      autoFitColumns(xInstance);
+    }
+
+    function applyColorAttribute(xInstance, attr, value) {
+      if (!value || !xInstance) return;
+      const data = xInstance.sheet?.data;
+      if (typeof data?.setSelectedCellAttr !== 'function') return;
+      data.setSelectedCellAttr(attr, value);
+      if (typeof xInstance.sheet?.table?.render === 'function') {
+        xInstance.sheet.table.render();
+      } else if (typeof xInstance.reRender === 'function') {
+        xInstance.reRender();
+      }
+    }
+
+    function createCustomToolbarButton({ label, title, icon, className, onClick }) {
+      const btn = document.createElement('div');
+      btn.className = `x-spreadsheet-toolbar-btn xspreadsheet-custom-btn ${className || ''}`.trim();
+      btn.title = title;
+      btn.setAttribute('role', 'button');
+      btn.tabIndex = 0;
+      btn.innerHTML = `<span class="custom-toolbar-icon">${icon}</span><span class="custom-toolbar-label">${label}</span>`;
+      const handler = (evt) => {
+        evt?.preventDefault?.();
+        if (typeof onClick === 'function') onClick();
+      };
+      btn.addEventListener('click', handler);
+      btn.addEventListener('keydown', (evt) => {
+        if (evt.key === 'Enter' || evt.key === ' ') {
+          evt.preventDefault();
+          handler(evt);
+        }
+      });
+      return btn;
+    }
+
+    function createColorToolbarButton({ label, title, icon, defaultColor, onColorChange }) {
+      const btn = document.createElement('div');
+      btn.className = 'x-spreadsheet-toolbar-btn xspreadsheet-custom-btn xspreadsheet-color-btn';
+      btn.title = title;
+      btn.tabIndex = 0;
+      btn.setAttribute('role', 'button');
+      btn.innerHTML = `
+        <span class="custom-toolbar-icon">${icon}</span>
+        <span class="custom-toolbar-label">${label}</span>
+        <span class="xspreadsheet-color-preview" style="--color-value: ${defaultColor}"></span>
+      `;
+      const colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.value = defaultColor;
+      colorInput.className = 'xspreadsheet-color-input';
+      colorInput.tabIndex = -1;
+      btn.appendChild(colorInput);
+
+      const preview = btn.querySelector('.xspreadsheet-color-preview');
+      const handleColorChange = (value) => {
+        if (!value) return;
+        preview?.style.setProperty('--color-value', value);
+        if (typeof onColorChange === 'function') onColorChange(value);
+      };
+
+      const openPicker = () => {
+        try {
+          if (typeof colorInput.showPicker === 'function') colorInput.showPicker();
+          else colorInput.click();
+        } catch (err) {
+          colorInput.click();
+        }
+      };
+
+      btn.addEventListener('click', (evt) => {
+        evt.preventDefault();
+        openPicker();
+      });
+      btn.addEventListener('keydown', (evt) => {
+        if (evt.key === 'Enter' || evt.key === ' ') {
+          evt.preventDefault();
+          openPicker();
+        }
+      });
+      colorInput.addEventListener('input', () => handleColorChange(colorInput.value));
+      colorInput.addEventListener('change', () => handleColorChange(colorInput.value));
+      return btn;
+    }
+
+    function ensureSizeModal() {
+      if (spreadsheetSizeModalInstance || !document?.body) return spreadsheetSizeModalInstance;
+      const overlay = document.createElement('div');
+      overlay.className = 'xspreadsheet-size-modal';
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.innerHTML = `
+        <div class="xspreadsheet-size-modal__dialog" role="dialog" aria-modal="true">
+          <button type="button" class="xspreadsheet-size-modal__close" aria-label="关闭" data-size-close>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+              <line x1="6" y1="18" x2="18" y2="6"></line>
+            </svg>
+          </button>
+          <div class="xspreadsheet-size-modal__title" data-size-title>统一设置行高</div>
+          <label class="xspreadsheet-size-modal__label">
+            <span data-size-label>行高 (像素)</span>
+            <input type="number" min="1" step="1" inputmode="decimal" class="input xspreadsheet-size-modal__input" data-size-input />
+          </label>
+          <div class="xspreadsheet-size-modal__error" data-size-error></div>
+          <div class="xspreadsheet-size-modal__actions">
+            <button type="button" class="btn btn--ghost btn-sm" data-size-cancel>取消</button>
+            <button type="button" class="btn btn--primary btn-sm" data-size-confirm>确定</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      const titleEl = overlay.querySelector('[data-size-title]');
+      const labelEl = overlay.querySelector('[data-size-label]');
+      const inputEl = overlay.querySelector('[data-size-input]');
+      const errorEl = overlay.querySelector('[data-size-error]');
+      const confirmBtn = overlay.querySelector('[data-size-confirm]');
+      const cancelBtn = overlay.querySelector('[data-size-cancel]');
+      const closeBtn = overlay.querySelector('[data-size-close]');
+
+      let confirmHandler = null;
+      let lastFocusedElement = null;
+
+      const hide = () => {
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+        confirmHandler = null;
+        if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+          lastFocusedElement.focus();
+        }
+      };
+
+      const show = ({ kind, defaultValue, onConfirm }) => {
+        lastFocusedElement = document.activeElement;
+        confirmHandler = onConfirm;
+        overlay.classList.add('is-open');
+        overlay.setAttribute('aria-hidden', 'false');
+        const isRow = kind === 'row';
+        titleEl.textContent = isRow ? '统一设置行高' : '统一设置列宽';
+        labelEl.textContent = isRow ? '行高 (像素)' : '列宽 (像素)';
+        const fallback = SIZE_MODAL_DEFAULTS[kind] || 10;
+        const value = Number.isFinite(defaultValue) ? defaultValue : fallback;
+        inputEl.value = value;
+        errorEl.textContent = '';
+        requestAnimationFrame(() => {
+          inputEl.focus();
+          inputEl.select();
+        });
+      };
+
+      const handleConfirm = () => {
+        const numeric = Number(inputEl.value);
+        if (!Number.isFinite(numeric) || numeric <= 0) {
+          errorEl.textContent = '请输入有效的正数值';
+          inputEl.focus();
+          inputEl.select();
+          return;
+        }
+        errorEl.textContent = '';
+        if (typeof confirmHandler === 'function') confirmHandler(numeric);
+        hide();
+      };
+
+      confirmBtn?.addEventListener('click', handleConfirm);
+      cancelBtn?.addEventListener('click', hide);
+      closeBtn?.addEventListener('click', hide);
+      overlay.addEventListener('click', (evt) => {
+        if (evt.target === overlay) hide();
+      });
+      overlay.addEventListener('keydown', (evt) => {
+        if (evt.key === 'Escape') {
+          evt.preventDefault();
+          hide();
+        } else if (evt.key === 'Enter' && evt.target === inputEl) {
+          evt.preventDefault();
+          handleConfirm();
+        }
+      });
+
+      spreadsheetSizeModalInstance = {
+        open: show,
+        close: hide,
+      };
+      return spreadsheetSizeModalInstance;
+    }
+
+    function openSizeModal(options) {
+      const modal = spreadsheetSizeModalInstance || ensureSizeModal();
+      if (!modal) return;
+      modal.open(options);
+    }
+
+    function customizeSpreadsheetToolbar(xInstance, attempt = 0) {
+      if (!docPreviewEl) return;
+      const toolbar = docPreviewEl.querySelector('.x-spreadsheet-toolbar');
+      if (!toolbar) {
+        if (attempt > 8) return;
+        setTimeout(() => customizeSpreadsheetToolbar(xInstance, attempt + 1), 50);
+        return;
+      }
+
+      while (toolbar.firstChild) {
+        toolbar.removeChild(toolbar.firstChild);
+      }
+
+      const colorGroup = document.createElement('div');
+      colorGroup.className = 'x-spreadsheet-toolbar-btns xspreadsheet-custom-color-group';
+      const textColorBtn = createColorToolbarButton({
+        label: '',
+        title: '设置字体颜色',
+        icon: TEXT_COLOR_ICON_SVG,
+        defaultColor: COLOR_DEFAULTS.text,
+        onColorChange: (value) => {
+          COLOR_DEFAULTS.text = value;
+          applyColorAttribute(xInstance, 'color', value);
+        },
+      });
+      const fillColorBtn = createColorToolbarButton({
+        label: '',
+        title: '设置填充颜色',
+        icon: FILL_COLOR_ICON_SVG,
+        defaultColor: COLOR_DEFAULTS.fill,
+        onColorChange: (value) => {
+          COLOR_DEFAULTS.fill = value;
+          applyColorAttribute(xInstance, 'bgcolor', value);
+        },
+      });
+      colorGroup.append(textColorBtn, fillColorBtn);
+
+      const group = document.createElement('div');
+      group.className = 'x-spreadsheet-toolbar-btns xspreadsheet-custom-sizing-group';
+
+      const rowBtn = createCustomToolbarButton({
+        label: '行高',
+        title: '统一设置所有行高',
+        icon: ROW_ICON_SVG,
+        className: 'custom-row-height-btn',
+        onClick: () => {
+          openSizeModal({
+            kind: 'row',
+            defaultValue: SIZE_MODAL_DEFAULTS.row,
+            onConfirm: (value) => {
+              SIZE_MODAL_DEFAULTS.row = value;
+              applyUniformSize(xInstance, 'row', value);
+            },
+          });
+        },
+      });
+
+      const colBtn = createCustomToolbarButton({
+        label: '列宽',
+        title: '统一设置所有列宽',
+        icon: COL_ICON_SVG,
+        className: 'custom-col-width-btn',
+        onClick: () => {
+          openSizeModal({
+            kind: 'col',
+            defaultValue: SIZE_MODAL_DEFAULTS.col,
+            onConfirm: (value) => {
+              SIZE_MODAL_DEFAULTS.col = value;
+              applyUniformSize(xInstance, 'col', value);
+            },
+          });
+        },
+      });
+
+      const autoRowBtn = createCustomToolbarButton({
+        label: '行高自适应',
+        title: '根据内容自动调整行高',
+        icon: AUTO_ROW_ICON_SVG,
+        className: 'custom-auto-row-btn',
+        onClick: () => autoFitRows(xInstance),
+      });
+
+      const autoColBtn = createCustomToolbarButton({
+        label: '列宽自适应',
+        title: '根据内容自动调整列宽',
+        icon: AUTO_COL_ICON_SVG,
+        className: 'custom-auto-col-btn',
+        onClick: () => autoFitColumns(xInstance),
+      });
+
+      const autoAllBtn = createCustomToolbarButton({
+        label: '一键自适应',
+        title: '自动调整所有行高和列宽',
+        icon: AUTO_ALL_ICON_SVG,
+        className: 'custom-auto-all-btn',
+        onClick: () => autoFitAll(xInstance),
+      });
+
+      group.append(rowBtn, colBtn, autoRowBtn, autoColBtn, autoAllBtn);
+      toolbar.append(colorGroup, group);
+    }
+    function cleanupDrawioPanHandlers() {
+      if (typeof disposeDrawioPanSurface === 'function') {
+        disposeDrawioPanSurface();
+        disposeDrawioPanSurface = null;
+      }
+      resetDrawioPanPosition = null;
+    }
+    function cleanupPdfViewer() {
+      if (typeof disposePdfViewer === 'function') {
+        disposePdfViewer();
+        disposePdfViewer = null;
+      }
+    }
+    function cleanupMarpitNavigation() {
+      if (typeof disposeMarpitNavigation === 'function') {
+        disposeMarpitNavigation();
+        disposeMarpitNavigation = null;
+      }
+    }
+    function cleanupWordToc() {
+      if (typeof disposeWordToc === 'function') {
+        disposeWordToc();
+        disposeWordToc = null;
+      }
+      currentWordHeadingStyles = null;
+      if (docPreviewEl) docPreviewEl.classList.remove('word-preview-active');
+    }
+    function setupPptxViewerNavigation(viewerEl) {
+      if (!viewerEl) return;
+      const scrollContainer = viewerEl;
+      const state = {
+        slides: [],
+        activeIndex: 0,
+        waitTimer: null,
+        scrollRaf: null,
+        disposed: false,
+      };
+      const MAX_POLL_COUNT = 200;
+      const POLL_INTERVAL = 80;
+
+      const stopWaiting = () => {
+        if (state.waitTimer) {
+          window.clearTimeout(state.waitTimer);
+          state.waitTimer = null;
+        }
+      };
+
+      const centerSlide = (slide, behavior = 'smooth') => {
+        if (!slide || !scrollContainer) return;
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const slideRect = slide.getBoundingClientRect();
+        const offset = slideRect.top - containerRect.top + scrollContainer.scrollTop;
+        const target = Math.max(offset - (scrollContainer.clientHeight - slideRect.height) / 2, 0);
+        const scrollOptions = { top: target };
+        if (behavior) scrollOptions.behavior = behavior;
+        scrollContainer.scrollTo(scrollOptions);
+      };
+
+      const getClosestSlideIndex = () => {
+        if (!state.slides.length) return 0;
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const containerCenter = containerRect.top + containerRect.height / 2;
+        let closestIndex = 0;
+        let minDistance = Infinity;
+        state.slides.forEach((slide, index) => {
+          const rect = slide.getBoundingClientRect();
+          const slideCenter = rect.top + rect.height / 2;
+          const distance = Math.abs(slideCenter - containerCenter);
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestIndex = index;
+          }
+        });
+        return closestIndex;
+      };
+
+      const updateActiveIndex = (index, options = {}) => {
+        if (!state.slides.length) return;
+        const clamped = Math.min(Math.max(index, 0), state.slides.length - 1);
+        const shouldScroll = options.scroll !== false;
+        const forceScroll = !!options.forceScroll;
+        if (clamped === state.activeIndex && !forceScroll) {
+          if (shouldScroll) centerSlide(state.slides[clamped], options.behavior || 'smooth');
+          return;
+        }
+        const prevSlide = state.slides[state.activeIndex];
+        if (prevSlide) prevSlide.classList.remove('pptx-slide--active');
+        const nextSlide = state.slides[clamped];
+        if (nextSlide) nextSlide.classList.add('pptx-slide--active');
+        state.activeIndex = clamped;
+        if (shouldScroll) {
+          centerSlide(nextSlide, options.behavior || 'smooth');
+        }
+      };
+
+      const handleKeyDown = (event) => {
+        if (event.key !== 'PageDown' && event.key !== 'PageUp') return;
+        if (!shouldHandleArrowNavigation(event)) return;
+        if (!state.slides.length) return;
+        const delta = event.key === 'PageDown' ? 1 : -1;
+        const targetIndex = Math.min(
+          Math.max(state.activeIndex + delta, 0),
+          state.slides.length - 1,
+        );
+        if (targetIndex === state.activeIndex) return;
+        event.preventDefault();
+        updateActiveIndex(targetIndex, { behavior: 'smooth', forceScroll: true });
+      };
+
+      const handleScroll = () => {
+        if (state.scrollRaf) return;
+        state.scrollRaf = window.requestAnimationFrame(() => {
+          state.scrollRaf = null;
+          const closest = getClosestSlideIndex();
+          if (closest !== state.activeIndex) {
+            updateActiveIndex(closest, { scroll: false });
+          }
+        });
+      };
+
+      const teardown = () => {
+        if (state.disposed) return;
+        state.disposed = true;
+        stopWaiting();
+        if (state.scrollRaf) {
+          window.cancelAnimationFrame(state.scrollRaf);
+          state.scrollRaf = null;
+        }
+        scrollContainer.removeEventListener('scroll', handleScroll);
+        window.removeEventListener('keydown', handleKeyDown);
+        state.slides.forEach((slide) => slide.classList.remove('pptx-slide--active'));
+        state.slides = [];
+      };
+
+      const initNavigation = (slides) => {
+        state.slides = slides;
+        if (!state.slides.length) return;
+        scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+        window.addEventListener('keydown', handleKeyDown);
+        const initialIndex = getClosestSlideIndex();
+        updateActiveIndex(initialIndex, { behavior: 'auto', forceScroll: true });
+      };
+
+      const waitForSlides = (attempt = 0) => {
+        if (state.disposed) return;
+        const nodes = Array.from(scrollContainer.querySelectorAll('.slide'))
+          .filter((node) => node instanceof HTMLElement);
+        if (nodes.length) {
+          initNavigation(nodes);
+          return;
+        }
+        if (attempt >= MAX_POLL_COUNT) return;
+        state.waitTimer = window.setTimeout(() => {
+          state.waitTimer = null;
+          waitForSlides(attempt + 1);
+        }, POLL_INTERVAL);
+      };
+
+      disposePptxViewer = teardown;
+      waitForSlides();
+    }
+    function setupMarpitKeyboardNavigation(slideElements) {
+      cleanupMarpitNavigation();
+      if (!slideElements || !slideElements.length) return;
+
+      const slides = Array.from(slideElements);
+      const getViewportCenter = () => {
+        const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        return scrollTop + viewportHeight / 2;
+      };
+      const getCurrentSlideIndex = () => {
+        const viewportCenter = getViewportCenter();
+        let closestIndex = 0;
+        let minDistance = Infinity;
+        slides.forEach((slide, index) => {
+          const rect = slide.getBoundingClientRect();
+          const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+          const slideCenter = rect.top + scrollTop + rect.height / 2;
+          const distance = Math.abs(slideCenter - viewportCenter);
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestIndex = index;
+          }
+        });
+        return closestIndex;
+      };
+
+      const scrollToSlide = (index) => {
+        const clamped = Math.min(Math.max(index, 0), slides.length - 1);
+        const target = slides[clamped];
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      };
+
+      const handler = (event) => {
+        if (event.key !== 'PageDown' && event.key !== 'PageUp') return;
+        if (!shouldHandleArrowNavigation(event)) return;
+        const direction = event.key === 'PageDown' ? 1 : -1;
+        const currentIndex = getCurrentSlideIndex();
+        const targetIndex = Math.min(Math.max(currentIndex + direction, 0), slides.length - 1);
+        if (targetIndex === currentIndex) return;
+        event.preventDefault();
+        scrollToSlide(targetIndex);
+      };
+
+      window.addEventListener('keydown', handler);
+      disposeMarpitNavigation = () => {
+        window.removeEventListener('keydown', handler);
+      };
+    }
+    function cleanupPptxViewer() { if (disposePptxViewer) { disposePptxViewer(); disposePptxViewer = null; } }
+    function showPreviewPlaceholder(msg) { showDocStatus(msg); }
+    
+    async function fetchText(p) { const r = await fetch(p); return r.text(); }
+    async function fetchBuffer(p) { const r = await fetch(p); return r.arrayBuffer(); }
+
+    async function previewText(path) {
+       const text = await fetchText(path);
+       docPreviewEl.innerHTML = `<pre style="padding:1rem; white-space:pre-wrap;">${escapeHtml(text)}</pre>`;
+    }
+    async function previewPdf(path) {
+       const pdfjsLib = await ensurePdfJs();
+       docPreviewEl.innerHTML = `
+         <div class="pdf-viewer-wrapper">
+           <div class="pdf-viewer">
+             <div class="pdf-viewer__toolbar">
+               <div class="pdf-group">
+                 <button class="pdf-btn pdf-btn--icon" data-pdf-action="prev" disabled title="上一页">
+                   <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"></path></svg>
+                 </button>
+                 <span class="pdf-viewer__page-count" id="pdfPageInfo">-- / --</span>
+                 <button class="pdf-btn pdf-btn--icon" data-pdf-action="next" disabled title="下一页">
+                   <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path></svg>
+                 </button>
+               </div>
+               <div class="pdf-group">
+                 <input type="number" min="1" id="pdfPageInput" class="pdf-input" placeholder="Go" disabled />
+                 <button class="pdf-btn" data-pdf-action="jump" disabled>跳转</button>
+               </div>
+               <div class="pdf-group">
+                 <button class="pdf-btn pdf-btn--icon" data-pdf-action="zoom-out" disabled title="缩小">
+                   <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4"></path></svg>
+                 </button>
+                 <span class="pdf-viewer__zoom" id="pdfZoomLabel">100%</span>
+                 <button class="pdf-btn pdf-btn--icon" data-pdf-action="zoom-in" disabled title="放大">
+                   <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                 </button>
+                                <button class="pdf-btn pdf-btn--icon" data-pdf-action="fit" disabled title="适应宽度">
+                                  <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                                </button>
+                              </div>
+                              <div class="pdf-group">
+                                <button class="pdf-btn pdf-btn--icon" data-pdf-action="toggle-drawer" title="目录">
+                                  <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+                                </button>
+                              </div>
+                            </div>
+                            <div class="pdf-viewer__pages" id="pdfPages"></div>             <div class="pdf-viewer__status" id="pdfStatus">正在加载 PDF ...</div>
+           </div>
+           <button class="pdf-bookmark-toggle" id="pdfBookmarkToggle" title="查看书签">书签</button>
+           <aside class="pdf-bookmark-drawer" id="pdfBookmarkDrawer" aria-label="PDF 书签列表">
+            <div class="pdf-bookmark-drawer__header">
+              <h3 class="pdf-bookmark-drawer__title">目录</h3>
+              <button class="pdf-bookmark-drawer__close pdf-btn--icon" id="pdfBookmarkClose" data-pdf-action="close-drawer" title="关闭">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </div>
+             <div class="pdf-bookmark-drawer__search">
+               <input type="text" id="pdfBookmarkSearch" class="pdf-input" placeholder="搜索书签..." />
+             </div>
+             <div class="pdf-bookmark-drawer__list" id="pdfBookmarkList"></div>
+           </aside>
+         </div>`;
+
+       const pagesContainer = docPreviewEl.querySelector('#pdfPages');
+       const statusEl = docPreviewEl.querySelector('#pdfStatus');
+       const pageInfoEl = docPreviewEl.querySelector('#pdfPageInfo');
+       const zoomLabel = docPreviewEl.querySelector('#pdfZoomLabel');
+       const prevBtn = docPreviewEl.querySelector('[data-pdf-action="prev"]');
+       const nextBtn = docPreviewEl.querySelector('[data-pdf-action="next"]');
+       const zoomOutBtn = docPreviewEl.querySelector('[data-pdf-action="zoom-out"]');
+       const zoomInBtn = docPreviewEl.querySelector('[data-pdf-action="zoom-in"]');
+       const fitBtn = docPreviewEl.querySelector('[data-pdf-action="fit"]');
+       const jumpBtn = docPreviewEl.querySelector('[data-pdf-action="jump"]');
+       const pageInput = docPreviewEl.querySelector('#pdfPageInput');
+       const bookmarkToggleBtn = docPreviewEl.querySelector('#pdfBookmarkToggle');
+       const bookmarkDrawer = docPreviewEl.querySelector('#pdfBookmarkDrawer');
+       const bookmarkSearchInput = docPreviewEl.querySelector('#pdfBookmarkSearch');
+       const bookmarkListContainer = docPreviewEl.querySelector('#pdfBookmarkList');
+       const bookmarkCloseBtn = docPreviewEl.querySelector('#pdfBookmarkClose');
+       const controlButtons = [prevBtn, nextBtn, zoomOutBtn, zoomInBtn, fitBtn, jumpBtn];
+
+       const setStatus = (msg) => {
+         if (!statusEl) return;
+         if (msg) {
+           statusEl.textContent = msg;
+           statusEl.style.display = 'block';
+         } else {
+           statusEl.textContent = '';
+           statusEl.style.display = 'none';
+         }
+       };
+
+       setStatus('正在加载 PDF ...');
+       const loadingTask = pdfjsLib.getDocument({ url: path });
+       let pdfDoc = null;
+       let currentPage = 1;
+       const isTransportDestroyed = (error) => (
+         Boolean(error) && typeof error.message === 'string' && error.message.includes('Transport destroyed')
+       );
+       let totalPages = 0;
+       let scale = 1;
+       let shouldMaintainFit = true;
+       let handleResize = null;
+       let pdfKeydownHandler = null;
+       let bookmarkDrawerVisible = false;
+       let pdfBookmarks = [];
+       let bookmarkLoading = true;
+       const pageElements = new Map();
+       let goToPageRef = () => {};
+
+       if (bookmarkToggleBtn) bookmarkToggleBtn.classList.add('loading');
+       if (bookmarkSearchInput) bookmarkSearchInput.disabled = true;
+
+       const endBookmarkLoading = (hasBookmarks = false) => {
+         bookmarkLoading = false;
+         if (bookmarkToggleBtn) {
+           bookmarkToggleBtn.classList.remove('loading');
+           bookmarkToggleBtn.style.display = hasBookmarks ? 'inline-flex' : 'none';
+         }
+         if (bookmarkSearchInput) bookmarkSearchInput.disabled = !hasBookmarks;
+       };
+       const MIN_SCALE = 0.6;
+       const MAX_SCALE = 4;
+
+       disposePdfViewer = () => {
+         if (handleResize) {
+           window.removeEventListener('resize', handleResize);
+           handleResize = null;
+         }
+         if (pdfKeydownHandler) {
+           window.removeEventListener('keydown', pdfKeydownHandler);
+           pdfKeydownHandler = null;
+         }
+         if (pdfDoc) pdfDoc.cleanup();
+         if (loadingTask && typeof loadingTask.destroy === 'function') loadingTask.destroy();
+       };
+
+       const updateZoomLabel = () => {
+         zoomLabel.textContent = `${Math.round(scale * 100)}%`;
+       };
+
+       const updateNavButtons = () => {
+         prevBtn.disabled = currentPage <= 1;
+         nextBtn.disabled = currentPage >= totalPages;
+         zoomInBtn.disabled = scale >= MAX_SCALE - 0.01;
+         zoomOutBtn.disabled = scale <= MIN_SCALE + 0.01;
+       };
+
+       const ensurePageElement = (pageNumber) => {
+         if (pageElements.has(pageNumber)) return pageElements.get(pageNumber);
+         const wrapper = document.createElement('div');
+         wrapper.className = 'pdf-page';
+         wrapper.dataset.page = String(pageNumber);
+         const canvas = document.createElement('canvas');
+         const ctx = canvas.getContext('2d');
+         const label = document.createElement('div');
+         label.className = 'pdf-page__label';
+         label.textContent = `第 ${pageNumber} 页`;
+         wrapper.appendChild(canvas);
+         wrapper.appendChild(label);
+         pagesContainer.appendChild(wrapper);
+         const entry = { wrapper, canvas, ctx, label };
+         pageElements.set(pageNumber, entry);
+         return entry;
+       };
+
+       const computeFitScale = async () => {
+         const firstPage = await pdfDoc.getPage(1);
+         const availableWidth = Math.max(pagesContainer.clientWidth - 32, 0);
+         const unscaled = firstPage.getViewport({ scale: 1 });
+         const fitScale = availableWidth ? availableWidth / unscaled.width : scale;
+         return Math.min(MAX_SCALE, Math.max(MIN_SCALE, fitScale));
+       };
+
+       const setBookmarkDrawerVisible = (visible) => {
+         // if (bookmarkLoading) return;
+         bookmarkDrawerVisible = visible;
+         if (bookmarkDrawer) {
+           bookmarkDrawer.classList.toggle('open', visible);
+           if (visible && bookmarkLoading && bookmarkListContainer) {
+             bookmarkListContainer.innerHTML = '<div class="pdf-loading-spinner"></div><div style="text-align:center;color:#94a3b8;font-size:0.875rem;margin-top:0.5rem;">加载书签中...</div>';
+           }
+         }
+         if (!visible && bookmarkSearchInput) {
+           bookmarkSearchInput.value = '';
+           if (!bookmarkLoading) renderBookmarkList('');
+         }
+       };
+
+       const renderBookmarkList = (term = '') => {
+         if (!bookmarkListContainer) return;
+         const normalized = term.trim().toLowerCase();
+         const dataSource = normalized
+           ? pdfBookmarks.filter(bm => bm.title.toLowerCase().includes(normalized))
+           : pdfBookmarks;
+         if (!dataSource.length) {
+           const message = pdfBookmarks.length ? '没有匹配的书签' : '暂无书签';
+           bookmarkListContainer.innerHTML = `<div class="pdf-bookmark-empty">${message}</div>`;
+           return;
+         }
+         bookmarkListContainer.innerHTML = '';
+         dataSource.forEach((bookmark, index) => {
+           const item = document.createElement('button');
+           item.type = 'button';
+           item.className = 'pdf-bookmark';
+           item.textContent = bookmark.title;
+           item.title = bookmark.title;
+           item.dataset.page = bookmark.page ? String(bookmark.page) : '';
+           item.addEventListener('click', () => {
+             if (bookmark.page) goToPageRef(bookmark.page);
+             setBookmarkDrawerVisible(false);
+           });
+           bookmarkListContainer.appendChild(item);
+         });
+       };
+
+       const resolveDestinationPage = async (dest) => {
+         try {
+           const target = typeof dest === 'string' ? await pdfDoc.getDestination(dest) : dest;
+           if (!target || !target[0]) return null;
+           const ref = target[0];
+           const pageIndex = await pdfDoc.getPageIndex(ref);
+           return pageIndex + 1;
+         } catch {
+           return null;
+         }
+       };
+
+       const collectBookmarks = async (outlineItems) => {
+         const results = [];
+         if (!Array.isArray(outlineItems)) return results;
+         for (const item of outlineItems) {
+           const title = (item?.title || '').trim() || '未命名书签';
+           let page = null;
+           if (item.dest) page = await resolveDestinationPage(item.dest);
+           results.push({ title, page });
+           if (Array.isArray(item.items) && item.items.length) {
+             const children = await collectBookmarks(item.items);
+             results.push(...children);
+           }
+         }
+         return results;
+       };
+
+       const renderSinglePage = async (pageNumber) => {
+          const entry = ensurePageElement(pageNumber);
+          entry.wrapper.classList.add('pdf-page--rendering');
+          let page;
+          try {
+            page = await pdfDoc.getPage(pageNumber);
+          } catch (err) {
+            entry.wrapper.classList.remove('pdf-page--rendering');
+            if (isTransportDestroyed(err)) return;
+            throw err;
+          }
+          const viewport = page.getViewport({ scale });
+          entry.canvas.height = viewport.height;
+          entry.canvas.width = viewport.width;
+          setStatus(`渲染第 ${pageNumber} / ${totalPages} 页...`);
+          try {
+            await page.render({ canvasContext: entry.ctx, viewport, background: '#ffffff' }).promise;
+          } catch (err) {
+            if (err && err.name === 'RenderingCancelledException') {
+              entry.wrapper.classList.remove('pdf-page--rendering');
+              setStatus('');
+              return;
+            }
+            if (isTransportDestroyed(err)) {
+              entry.wrapper.classList.remove('pdf-page--rendering');
+              setStatus('');
+              return;
+            }
+            throw err;
+          }
+          entry.wrapper.classList.remove('pdf-page--rendering');
+       };
+
+       const renderAllPages = async (fitWidth = false) => {
+         if (fitWidth || shouldMaintainFit) {
+           scale = await computeFitScale();
+         }
+         updateZoomLabel();
+         for (let i = 1; i <= totalPages; i += 1) {
+           await renderSinglePage(i);
+         }
+         setStatus('');
+       };
+
+       const syncPageIndicators = () => {
+         pageInfoEl.textContent = `${currentPage} / ${totalPages}`;
+         if (!pageInput.disabled) pageInput.value = currentPage;
+         updateNavButtons();
+       };
+
+       const scrollToPage = (pageNumber, behavior = 'smooth') => {
+         const entry = pageElements.get(pageNumber);
+         if (!entry) return;
+         const top = entry.wrapper.offsetTop;
+         if (typeof pagesContainer.scrollTo === 'function') pagesContainer.scrollTo({ top, behavior });
+         else pagesContainer.scrollTop = top;
+       };
+
+       const clampPage = (pageNumber) => Math.min(Math.max(pageNumber, 1), totalPages);
+       const goToPage = (target) => {
+         const desired = clampPage(target);
+         scrollToPage(desired);
+         currentPage = desired;
+         syncPageIndicators();
+       };
+       goToPageRef = goToPage;
+
+       const updateCurrentPageFromScroll = () => {
+         if (!totalPages) return;
+         const scrollTop = pagesContainer.scrollTop;
+         let closestPage = currentPage;
+         let minDistance = Infinity;
+         pageElements.forEach((entry, pageNum) => {
+           const distance = Math.abs(entry.wrapper.offsetTop - scrollTop);
+           if (distance < minDistance) {
+             minDistance = distance;
+             closestPage = pageNum;
+           }
+         });
+         closestPage = clampPage(closestPage);
+         if (closestPage !== currentPage) {
+           currentPage = closestPage;
+           syncPageIndicators();
+         }
+       };
+
+       try {
+         pdfDoc = await loadingTask.promise;
+       } catch (error) {
+         if (isTransportDestroyed(error)) {
+           setStatus('');
+           endBookmarkLoading(false);
+           return;
+         }
+         setStatus('');
+         endBookmarkLoading(false);
+         cleanupPdfViewer();
+         showDocStatus(`PDF 加载失败: ${error?.message || '未知错误'}`);
+         return;
+       }
+       totalPages = pdfDoc.numPages;
+       pageInfoEl.textContent = `1 / ${totalPages}`;
+       pageInput.disabled = false;
+       pageInput.min = 1;
+       pageInput.max = totalPages;
+       pageInput.value = 1;
+       try {
+         const outline = await pdfDoc.getOutline();
+         pdfBookmarks = await collectBookmarks(outline);
+         endBookmarkLoading(pdfBookmarks.length > 0);
+       } catch (err) {
+         if (isTransportDestroyed(err)) {
+           endBookmarkLoading(false);
+           return;
+         }
+         pdfBookmarks = [];
+         endBookmarkLoading(false);
+       }
+       renderBookmarkList();
+       setBookmarkDrawerVisible(false);
+
+       await renderAllPages(true);
+       pagesContainer.scrollTop = 0;
+       updateCurrentPageFromScroll();
+       controlButtons.forEach(btn => btn.disabled = false);
+       syncPageIndicators();
+
+       if (bookmarkToggleBtn) bookmarkToggleBtn.addEventListener('click', () => {
+         setBookmarkDrawerVisible(!bookmarkDrawerVisible);
+       });
+
+       const toggleDrawerBtn = docPreviewEl.querySelector('[data-pdf-action="toggle-drawer"]');
+       if (toggleDrawerBtn) {
+          toggleDrawerBtn.addEventListener('click', () => {
+             setBookmarkDrawerVisible(!bookmarkDrawerVisible);
+          });
+       }
+
+       if (bookmarkCloseBtn) bookmarkCloseBtn.addEventListener('click', () => setBookmarkDrawerVisible(false));
+       if (bookmarkSearchInput) bookmarkSearchInput.addEventListener('input', (event) => {
+         if (bookmarkLoading) return;
+         renderBookmarkList(event.target.value);
+       });
+
+       prevBtn.addEventListener('click', () => goToPage(currentPage - 1));
+       nextBtn.addEventListener('click', () => goToPage(currentPage + 1));
+       zoomInBtn.addEventListener('click', async () => {
+         shouldMaintainFit = false;
+         scale = Math.min(MAX_SCALE, scale + 0.2);
+         await renderAllPages();
+         syncPageIndicators();
+       });
+       zoomOutBtn.addEventListener('click', async () => {
+         shouldMaintainFit = false;
+         scale = Math.max(MIN_SCALE, scale - 0.2);
+         await renderAllPages();
+         syncPageIndicators();
+       });
+       fitBtn.addEventListener('click', async () => {
+         shouldMaintainFit = true;
+         await renderAllPages(true);
+         syncPageIndicators();
+       });
+       jumpBtn.addEventListener('click', () => {
+         const value = Number(pageInput.value);
+         if (Number.isNaN(value)) return;
+         goToPage(value);
+       });
+       pageInput.addEventListener('keydown', (event) => {
+         if (event.key === 'Enter') {
+           event.preventDefault();
+           const value = Number(pageInput.value);
+           if (!Number.isNaN(value)) goToPage(value);
+         }
+       });
+
+       let scrollFrame = null;
+       pagesContainer.addEventListener('scroll', () => {
+         if (scrollFrame) return;
+         scrollFrame = requestAnimationFrame(() => {
+           scrollFrame = null;
+           updateCurrentPageFromScroll();
+         });
+       });
+
+       handleResize = async () => {
+         if (shouldMaintainFit) {
+           await renderAllPages(true);
+           syncPageIndicators();
+         }
+       };
+       window.addEventListener('resize', handleResize);
+
+       pdfKeydownHandler = (event) => {
+         if (!shouldHandleArrowNavigation(event)) return;
+         if (event.key === 'PageDown') {
+           event.preventDefault();
+           goToPage(currentPage + 1);
+         } else if (event.key === 'PageUp') {
+           event.preventDefault();
+           goToPage(currentPage - 1);
+         }
+       };
+       window.addEventListener('keydown', pdfKeydownHandler);
+    }
+    async function previewWord(path) {
+       cleanupWordToc();
+       const buff = await fetchBuffer(path);
+       const headingStylesPromise = parseDocxHeadingStyles(buff);
+       docPreviewEl.innerHTML = '';
+       await window.docx.renderAsync(buff, docPreviewEl);
+       const wordRoot = docPreviewEl.querySelector('.docx-wrapper') || docPreviewEl;
+       currentWordHeadingStyles = await headingStylesPromise;
+       setupWordToc(wordRoot, currentWordHeadingStyles);
+    }
+    const WORD_NAMESPACE = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    function normalizeDocxStyleName(name) {
+      if (!name) return '';
+      return String(name).trim().toLowerCase().replace(/[ .]+/g, '-').replace(/[&]+/g, 'and');
+    }
+    function getWordAttr(element, attr) {
+      if (!element || !attr) return null;
+      return element.getAttribute(attr) || element.getAttribute(`w:${attr}`) || (element.getAttributeNS ? element.getAttributeNS(WORD_NAMESPACE, attr) : null);
+    }
+    function inferHeadingLevelFromName(nameValue) {
+      if (!nameValue) return null;
+      const normalized = String(nameValue).trim().toLowerCase();
+      let match = normalized.match(/heading(?:[\s\-]?)([0-9]+)/);
+      if (!match) match = normalized.match(/标题(?:[\s\-]?)([0-9]+)/);
+      if (!match) match = normalized.match(/title(?:[\s\-]?)([0-9]+)/);
+      if (match) {
+        const lvl = Number(match[1]);
+        if (!Number.isNaN(lvl)) return lvl;
+      }
+      if (normalized.includes('heading') || normalized.includes('标题')) return 2;
+      if (normalized.includes('title')) return 1;
+      return null;
+    }
+    function resolveHeadingLevelFromStyle(styleEl) {
+      if (!styleEl) return null;
+      const outlineEl = styleEl.getElementsByTagNameNS ? styleEl.getElementsByTagNameNS(WORD_NAMESPACE, 'outlineLvl')[0] : null;
+      if (outlineEl) {
+        const val = getWordAttr(outlineEl, 'val');
+        if (val !== null && val !== undefined && val !== '') {
+          const parsed = Number(val);
+          if (!Number.isNaN(parsed)) return parsed + 1;
+        }
+      }
+      const nameEl = styleEl.getElementsByTagNameNS ? styleEl.getElementsByTagNameNS(WORD_NAMESPACE, 'name')[0] : null;
+      const nameValue = getWordAttr(nameEl, 'val');
+      return inferHeadingLevelFromName(nameValue);
+    }
+    async function parseDocxHeadingStyles(buffer) {
+      if (!buffer || !window.JSZip) return null;
+      try {
+        const zip = await window.JSZip.loadAsync(buffer);
+        const stylesEntry = zip.file('word/styles.xml');
+        if (!stylesEntry) return null;
+        const xmlText = await stylesEntry.async('string');
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
+        const styleEls = Array.from(xmlDoc.getElementsByTagNameNS ? xmlDoc.getElementsByTagNameNS(WORD_NAMESPACE, 'style') : xmlDoc.getElementsByTagName('w:style'));
+        if (!styleEls.length) return null;
+        const headingMap = new Map();
+        styleEls.forEach((styleEl) => {
+          const styleId = getWordAttr(styleEl, 'styleId');
+          if (!styleId) return;
+          const level = resolveHeadingLevelFromStyle(styleEl);
+          if (!level) return;
+          const normalizedId = normalizeDocxStyleName(styleId);
+          if (!normalizedId) return;
+          const className = `${DOCX_STYLE_PREFIX}_${normalizedId}`;
+          if (!headingMap.has(className)) headingMap.set(className, { level, styleId });
+        });
+        return headingMap.size ? headingMap : null;
+      } catch (error) {
+        console.warn('解析 Word 样式失败', error);
+        return null;
+      }
+    }
+    function resolveWordHeadingInfo(node, headingStyles) {
+      if (!node) return null;
+      const styleInfo = getHeadingInfoFromStyles(node, headingStyles);
+      if (styleInfo) return styleInfo;
+      const fallbackLevel = getWordHeadingLevel(node);
+      if (fallbackLevel) return { level: fallbackLevel };
+      return null;
+    }
+    function getHeadingInfoFromStyles(node, headingStyles) {
+      if (!headingStyles || !node?.classList) return null;
+      for (const cls of node.classList) {
+        if (!cls) continue;
+        const entry = headingStyles.get(cls);
+        if (entry) return entry;
+      }
+      return null;
+    }
+    function getWordHeadingLevel(node) {
+      if (!node) return null;
+      const tag = node.tagName ? node.tagName.toUpperCase() : '';
+      if (/^H[1-6]$/.test(tag)) return Number(tag.substring(1));
+      const classList = Array.from(node.classList || []);
+      if (!classList.length) return null;
+      for (const cls of classList) {
+        const normalized = cls.toLowerCase();
+        if (!normalized.includes('heading') && !normalized.includes('标题') && !normalized.includes('title')) continue;
+        const headingMatch = normalized.match(/heading[-_\s]?([0-9]+)/);
+        const chineseMatch = normalized.match(/标题[-_\s]?([0-9]+)/);
+        const digits = headingMatch?.[1] || chineseMatch?.[1];
+        if (digits) {
+          const level = Number(digits);
+          if (!Number.isNaN(level)) return Math.min(Math.max(level, 1), 6);
+        }
+        if (normalized.includes('heading') || normalized.includes('标题')) return 2;
+        if (normalized.includes('title')) return 1;
+      }
+      return null;
+    }
+    function buildWordHeadingEntries(root, headingStyles) {
+      if (!root) return [];
+      const slugCounts = new Map();
+      const nodes = root.querySelectorAll('p, h1, h2, h3, h4, h5, h6');
+      const entries = [];
+      nodes.forEach((node) => {
+        const text = node.textContent?.trim();
+        if (!text) return;
+        const headingInfo = resolveWordHeadingInfo(node, headingStyles);
+        const level = headingInfo?.level;
+        if (!level) return;
+        let anchorId = node.id;
+        const base = slugify(text) || `word-heading-${entries.length + 1}`;
+        if (!anchorId) {
+          const count = slugCounts.get(base) || 0;
+          slugCounts.set(base, count + 1);
+          anchorId = count ? `${base}-${count}` : base;
+          node.id = anchorId;
+        }
+        entries.push({ id: anchorId, text, level, element: node });
+      });
+      return entries;
+    }
+    function getWordScrollContainer() {
+      if (!docPreviewEl) return null;
+      const container = docPreviewEl.closest('.preview__content');
+      return container || docPreviewEl;
+    }
+    function setupWordToc(root, headingStyles) {
+      if (!docPreviewEl || !root) return;
+      const headings = buildWordHeadingEntries(root, headingStyles);
+      const hasHeadings = headings.length > 0;
+      if (!hasHeadings) {
+        docPreviewEl.classList.remove('word-preview-active');
+        return;
+      }
+      docPreviewEl.classList.add('word-preview-active');
+
+      const toggleIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>`;
+      const closeIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+
+      const toggleBtn = document.createElement('button');
+      toggleBtn.type = 'button';
+      toggleBtn.className = 'word-floating-toggle';
+      toggleBtn.title = '显示目录';
+      toggleBtn.innerHTML = toggleIcon;
+
+      const panel = document.createElement('aside');
+      panel.className = 'word-toc-panel';
+      panel.innerHTML = `
+        <div class="word-toc__header">
+          <span>标题目录</span>
+          <button type="button" class="word-toc__close" aria-label="关闭目录">${closeIcon}</button>
+        </div>
+        <div class="word-toc__search">
+          <input type="text" class="input" placeholder="搜索标题..." />
+        </div>
+        <div class="word-toc__list" role="navigation" aria-label="Word 标题目录"></div>
+      `;
+
+      docPreviewEl.appendChild(toggleBtn);
+      docPreviewEl.appendChild(panel);
+
+      const listEl = panel.querySelector('.word-toc__list');
+      const searchInput = panel.querySelector('.word-toc__search .input');
+      const closeBtn = panel.querySelector('.word-toc__close');
+      const scrollContainer = getWordScrollContainer();
+
+      const scrollToHeading = (entry) => {
+        if (!entry?.element || !scrollContainer) return;
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const targetRect = entry.element.getBoundingClientRect();
+        const offset = targetRect.top - containerRect.top + scrollContainer.scrollTop;
+        scrollContainer.scrollTo({ top: Math.max(offset - 40, 0), behavior: 'smooth' });
+      };
+
+      const renderList = (items, isFiltered = false) => {
+        if (!listEl) return;
+        listEl.innerHTML = '';
+        if (!items.length) {
+          const message = hasHeadings && isFiltered ? '没有匹配的标题' : '暂无可用标题';
+          listEl.innerHTML = `<div class="word-toc__empty">${message}</div>`;
+          return;
+        }
+        items.forEach((entry) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'word-toc-item';
+          button.dataset.target = entry.id;
+          button.textContent = entry.text;
+          button.style.paddingLeft = `${12 + (entry.level - 1) * 16}px`;
+          button.addEventListener('click', () => {
+            scrollToHeading(entry);
+            setPanelVisible(false);
+          });
+          listEl.appendChild(button);
+        });
+      };
+
+      const setPanelVisible = (visible) => {
+        panel.classList.toggle('word-toc-panel--open', visible);
+        toggleBtn.classList.toggle('hidden', visible);
+        if (!visible && searchInput) {
+          searchInput.value = '';
+          renderList(headings);
+        }
+      };
+
+      if (searchInput) {
+        searchInput.disabled = !hasHeadings;
+        if (!hasHeadings) searchInput.placeholder = '未检测到标题';
+        searchInput.addEventListener('input', (event) => {
+          const term = event.target.value.trim().toLowerCase();
+          if (!term) {
+            renderList(headings);
+            return;
+          }
+          const filtered = headings.filter((entry) => entry.text.toLowerCase().includes(term));
+          renderList(filtered, true);
+        });
+      }
+
+      toggleBtn.addEventListener('click', () => setPanelVisible(true));
+      closeBtn?.addEventListener('click', () => setPanelVisible(false));
+      renderList(headings);
+      setPanelVisible(false);
+
+      disposeWordToc = () => {
+        toggleBtn.remove();
+        panel.remove();
+        docPreviewEl.classList.remove('word-preview-active');
+      };
+    }
+    function stox(wb) {
+      const out = [];
+      wb.SheetNames.forEach(name => {
+        const o = { name: name, rows: {}, cols: {}, merges: [], styles: [] };
+        const ws = wb.Sheets[name];
+        if(!ws || !ws['!ref']) return;
+        const range = window.XLSX.utils.decode_range(ws['!ref']);
+        
+        if (ws['!cols']) {
+            ws['!cols'].forEach((col, i) => {
+                if (col) o.cols[i] = { width: (col.wpx || (col.width || 10) * 7.5) }; 
+            });
+        }
+        
+        if (ws['!rows']) {
+            ws['!rows'].forEach((row, i) => {
+                if (row) {
+                    if (!o.rows[i]) o.rows[i] = { cells: {} };
+                    o.rows[i].height = row.hpx || row.hpt || 25;
+                }
+            });
+        }
+
+        for(let R = range.s.r; R <= range.e.r; ++R) {
+          for(let C = range.s.c; C <= range.e.c; ++C) {
+            const cell_address = window.XLSX.utils.encode_cell({r:R, c:C});
+            const cell = ws[cell_address];
+            if(!cell) continue;
+            if (!o.rows[R]) o.rows[R] = { cells: {} };
+            if (!o.rows[R].cells[C]) o.rows[R].cells[C] = {};
+            o.rows[R].cells[C].text = (cell.w || cell.v || '') + ''; 
+          }
+        }
+        
+        if(ws['!merges']) {
+          ws['!merges'].forEach(merge => {
+             const r = merge.s.r;
+             const c = merge.s.c;
+             if (!o.rows[r]) o.rows[r] = { cells: {} };
+             if (!o.rows[r].cells[c]) o.rows[r].cells[c] = {};
+             o.rows[r].cells[c].merge = [merge.e.r - r, merge.e.c - c];
+          });
+        }
+        out.push(o);
+      });
+      return out;
+    }
+
+        async function previewExcel(path) {
+           setExcelPreviewState(true);
+            try {
+                const buff = await fetchBuffer(path);
+                const wb = window.XLSX.read(buff, {type:'array'});
+                const data = stox(wb);
+                
+                docPreviewEl.innerHTML = '<div id="xspreadsheet"></div>';
+                // Ensure styles are loaded
+                if (!window.x_spreadsheet) {
+                     docPreviewEl.innerHTML = '<div style="padding:1rem;color:red;">x-spreadsheet library not loaded</div>';
+                     return;
+                }
+    
+                const x = new window.x_spreadsheet('#xspreadsheet', {
+                    showToolbar: true,
+                    showGrid: true,
+                    showContextmenu: true,
+                    view: {
+                        height: () => docPreviewEl.clientHeight,
+                        width: () => docPreviewEl.clientWidth,
+                    },
+                    row: {
+                        len: 100,
+                        height: 25,
+                    },
+                    col: {
+                        len: 26,
+                        width: 100,
+                        indexWidth: 60,
+                        minWidth: 60,
+                    },
+                    style: {
+                        bgcolor: '#ffffff',
+                        align: 'left',
+                        valign: 'middle',
+                        textwrap: false,
+                        strike: false,
+                        underline: false,
+                        color: '#0a0a0a',
+                        font: {
+                          name: 'Arial',
+                          size: 10,
+                          bold: false,
+                          italic: false,
+                        },
+                    },
+                });
+                x.loadData(data);
+                customizeSpreadsheetToolbar(x);
+                try {
+                    autoFitAll(x);
+                } catch (autoFitError) {
+                    console.warn('Auto fit failed:', autoFitError);
+                }
+
+                // Handle resize
+                if (docPreviewEl._resizeObserver) {
+                    docPreviewEl._resizeObserver.disconnect();
+                }
+                docPreviewEl._resizeObserver = new ResizeObserver(() => {
+                    x.reRender();
+                });
+                docPreviewEl._resizeObserver.observe(docPreviewEl);
+            } catch (error) {
+                setExcelPreviewState(false);
+                throw error;
+            }
+        }
+    async function previewSlides(path) {
+       cleanupPptxViewer();
+       docPreviewEl.innerHTML = '<div id="pptxViewer" class="pptx-viewer"></div>';
+       
+       $('#pptxViewer').pptxToHtml({ 
+         pptxFileUrl: path, 
+         slidesScale: '100%', 
+         slideMode: false, 
+         keyBoardShortCut: false,
+         jsZipV2: 'assets/jszip.v2.min.js',
+         mediaProcess: true
+       });
+       const viewerRoot = document.getElementById('pptxViewer');
+       if (viewerRoot) setupPptxViewerNavigation(viewerRoot);
+    }
+    async function previewMindmap(path) {
+       const txt = await fetchText(path);
+       docPreviewEl.innerHTML = '<svg id="mm" style="width:100%;height:100%"></svg>';
+       const { Markmap, loadCSS, loadJS } = window.markmap;
+       const transformer = new window.markmap.Transformer();
+       const { root, features } = transformer.transform(txt);
+       Markmap.create('#mm', { autoFit: true }, root);
+    }
+
+    function setupDrawioPanSurface(surface, canvas, shell) {
+       if (!surface || !canvas || !shell) return null;
+
+       canvas.style.width = `${DRAWIO_PAN_CANVAS_SIZE}px`;
+       canvas.style.height = `${DRAWIO_PAN_CANVAS_SIZE}px`;
+
+       let pointerId = null;
+       let startX = 0;
+       let startY = 0;
+       let panX = 0;
+       let panY = 0;
+       let originPanX = 0;
+       let originPanY = 0;
+
+       const updatePan = () => {
+         canvas.style.transform = `translate3d(${panX}px, ${panY}px, 0)`;
+       };
+
+       const syncShellSize = () => {
+         const rect = surface.getBoundingClientRect();
+         shell.style.width = `${rect.width}px`;
+         shell.style.height = `${rect.height}px`;
+       };
+
+       const centerCanvas = () => {
+         const rect = surface.getBoundingClientRect();
+         panX = (rect.width - DRAWIO_PAN_CANVAS_SIZE) / 2;
+         panY = (rect.height - DRAWIO_PAN_CANVAS_SIZE) / 2;
+         updatePan();
+       };
+
+       const stopDragging = () => {
+         if (pointerId === null) return;
+         pointerId = null;
+         surface.classList.remove('is-dragging');
+       };
+
+       const pointerDownOptions = { capture: true };
+
+       const handlePointerDown = (evt) => {
+         if (pointerId !== null) return;
+         if (typeof evt.button === 'number' && evt.button !== 0) return;
+         pointerId = evt.pointerId;
+         startX = evt.clientX;
+         startY = evt.clientY;
+         originPanX = panX;
+         originPanY = panY;
+         surface.classList.add('is-dragging');
+         evt.preventDefault();
+       };
+
+       const handlePointerMove = (evt) => {
+         if (pointerId !== evt.pointerId) return;
+         panX = originPanX + (evt.clientX - startX);
+         panY = originPanY + (evt.clientY - startY);
+         updatePan();
+         evt.preventDefault();
+       };
+
+       const handlePointerUp = (evt) => {
+         if (pointerId !== evt.pointerId) return;
+         stopDragging();
+       };
+
+       const cancelFromBlur = () => stopDragging();
+
+       surface.addEventListener('pointerdown', handlePointerDown, pointerDownOptions);
+       window.addEventListener('pointermove', handlePointerMove);
+       window.addEventListener('pointerup', handlePointerUp);
+       window.addEventListener('pointercancel', handlePointerUp);
+       window.addEventListener('blur', cancelFromBlur);
+
+       const handleResize = () => {
+         syncShellSize();
+         updatePan();
+       };
+       let cleanupResize = null;
+       if (typeof window.ResizeObserver === 'function') {
+         const observer = new window.ResizeObserver(() => handleResize());
+         observer.observe(surface);
+         cleanupResize = () => observer.disconnect();
+       } else {
+         window.addEventListener('resize', handleResize);
+         cleanupResize = () => window.removeEventListener('resize', handleResize);
+       }
+
+       syncShellSize();
+       centerCanvas();
+       if (typeof window.requestAnimationFrame === 'function') {
+         window.requestAnimationFrame(() => {
+           syncShellSize();
+           centerCanvas();
+         });
+       }
+
+        return {
+          center: centerCanvas,
+          cleanup: () => {
+           surface.removeEventListener('pointerdown', handlePointerDown, pointerDownOptions);
+           window.removeEventListener('pointermove', handlePointerMove);
+           window.removeEventListener('pointerup', handlePointerUp);
+           window.removeEventListener('pointercancel', handlePointerUp);
+           window.removeEventListener('blur', cancelFromBlur);
+           if (typeof cleanupResize === 'function') cleanupResize();
+           stopDragging();
+           surface.classList.remove('is-dragging');
+         }
+       };
+    }
+    async function previewDrawio(path) {
+       const xml = await fetchText(path);
+       const iconZoomIn = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>`;
+       const iconZoomOut = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>`;
+       const iconReset = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>`;
+       const iconFit = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>`;
+
+       docPreviewEl.innerHTML = `
+         <div class="drawio-wrapper">
+           <div class="drawio-pan-surface">
+             <div class="drawio-pan-canvas">
+               <div class="drawio-graph-shell">
+                 <div class="mxgraph" style="width:100%;height:100%;"></div>
+               </div>
+             </div>
+           </div>
+           <div class="drawio-toolbar">
+             <button class="btn" id="dioZoomIn" title="放大">${iconZoomIn}</button>
+             <button class="btn" id="dioZoomOut" title="缩小">${iconZoomOut}</button>
+             <button class="btn" id="dioFit" title="适应窗口">${iconFit}</button>
+             <button class="btn" id="dioReset" title="重置视图">${iconReset}</button>
+           </div>
+         </div>`;
+
+       const host = docPreviewEl.querySelector('.drawio-graph-shell .mxgraph');
+       host.setAttribute('data-mxgraph', JSON.stringify({xml, zoom:1, nav:false, resize:false, lightbox:0}));
+       const panSurface = docPreviewEl.querySelector('.drawio-pan-surface');
+       const panCanvas = docPreviewEl.querySelector('.drawio-pan-canvas');
+       const graphShell = docPreviewEl.querySelector('.drawio-graph-shell');
+       const panController = setupDrawioPanSurface(panSurface, panCanvas, graphShell);
+       if (panController) {
+          disposeDrawioPanSurface = panController.cleanup;
+          resetDrawioPanPosition = panController.center;
+       }
+
+       const zoomInBtn = docPreviewEl.querySelector('#dioZoomIn');
+       const zoomOutBtn = docPreviewEl.querySelector('#dioZoomOut');
+       const fitBtn = docPreviewEl.querySelector('#dioFit');
+       const resetBtn = docPreviewEl.querySelector('#dioReset');
+       
+       window.GraphViewer.createViewerForElement(host, function(viewer) {
+           if(viewer && viewer.graph) {
+               const graph = viewer.graph;
+
+               if (zoomInBtn) zoomInBtn.addEventListener('click', () => graph.zoomIn());
+               if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => graph.zoomOut());
+               if (fitBtn) fitBtn.addEventListener('click', () => {
+                  graph.fit();
+                  if (typeof resetDrawioPanPosition === 'function') resetDrawioPanPosition();
+               });
+               if (resetBtn) resetBtn.addEventListener('click', () => {
+                  graph.zoomTo(1);
+                  graph.center();
+                  if (typeof resetDrawioPanPosition === 'function') resetDrawioPanPosition();
+               });
+           }
+       });
+    }
+    async function previewMarpit(path) {
+       const txt = await fetchText(path);
+       if(!marpitInstance) marpitInstance = new window.marpit.Marpit();
+       const {html, css} = marpitInstance.render(txt);
+       const navIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>`;
+       const closeIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+       docPreviewEl.innerHTML = `
+         <style>${css}</style>
+         <style>${MARPIT_CUSTOM_STYLE}</style>
+         <div class="marpit-preview">
+          <aside class="marpit-toc collapsed" id="marpitToc">
+            <div class="marpit-toc__header">
+              <span>导航目录</span>
+              <button type="button" class="marpit-toc__close" id="closeMarpitToc" aria-label="关闭目录">${closeIcon}</button>
+            </div>
+            <div class="marpit-toc__body">
+              <div class="marpit-toc__search">
+                <input type="text" id="marpitTocSearch" class="input" placeholder="搜索标题..." />
+              </div>
+              <div class="marpit-toc__list" id="marpitTocList"></div>
+            </div>
+          </aside>
+           <button id="marpitTocToggle" type="button" class="marpit-floating-toggle" title="显示目录">${navIcon}</button>
+           <div class="marpit-wrapper">${html}</div>
+         </div>
+       `;
+
+       const marpitWrapper = docPreviewEl.querySelector('.marpit-wrapper');
+       const slides = marpitWrapper ? marpitWrapper.querySelectorAll('section') : [];
+       const tocList = docPreviewEl.querySelector('#marpitTocList');
+       const toggleBtn = docPreviewEl.querySelector('#marpitTocToggle');
+       const toc = docPreviewEl.querySelector('#marpitToc');
+       const closeBtn = docPreviewEl.querySelector('#closeMarpitToc');
+       const searchInput = docPreviewEl.querySelector('#marpitTocSearch');
+
+       const setTocVisibility = (visible) => {
+         if (!toc || !toggleBtn) return;
+         if (visible) {
+           toc.classList.remove('collapsed');
+           toggleBtn.classList.add('hidden');
+           if (searchInput) {
+             searchInput.value = '';
+             searchInput.dispatchEvent(new Event('input'));
+             searchInput.focus();
+           }
+         } else {
+           toc.classList.add('collapsed');
+           toggleBtn.classList.remove('hidden');
+         }
+       };
+
+       const tocItems = [];
+       slides.forEach((slide, index) => {
+         const heading = slide.querySelector('h1, h2, h3, h4, h5, h6');
+         const text = heading ? heading.textContent.trim() : '';
+         const label = text || `第 ${index + 1} 页`;
+         const slideId = `marpit-slide-${index}`;
+         slide.setAttribute('id', slideId);
+         if (!tocList) return;
+         const button = document.createElement('button');
+         button.type = 'button';
+         button.className = 'marpit-toc-item';
+         button.textContent = label;
+         button.dataset.target = slideId;
+         button.addEventListener('click', () => {
+           const target = document.getElementById(slideId);
+           if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+           setTocVisibility(false);
+         });
+         tocList.appendChild(button);
+         tocItems.push(button);
+       });
+
+       if (!tocItems.length) {
+         if (toggleBtn) toggleBtn.classList.add('hidden');
+         if (toc) toc.classList.add('marpit-toc--empty');
+         if (searchInput) searchInput.disabled = true;
+         return;
+       }
+
+       setTocVisibility(false);
+       if (toggleBtn) toggleBtn.addEventListener('click', () => setTocVisibility(true));
+       if (closeBtn) closeBtn.addEventListener('click', () => setTocVisibility(false));
+       if (searchInput) {
+         searchInput.addEventListener('input', (event) => {
+           const term = event.target.value.trim().toLowerCase();
+           tocItems.forEach(item => {
+             const matches = item.textContent.toLowerCase().includes(term);
+             item.style.display = matches ? 'block' : 'none';
+           });
+         });
+       }
+
+       setupMarpitKeyboardNavigation(slides);
+    }
+
+    function updateImageTransform() {
+       singleImage.style.transform = `translate(${translateX}px, ${translateY}px) scale(${zoomLevel})`;
+    }
+
+    function resetZoom() {
+       zoomLevel = 1; 
+       translateX = 0;
+       translateY = 0;
+       updateImageTransform();
+    }
+
+    zoomContainer.addEventListener('wheel', (e) => {
+       if(imagePreviewWrapper.classList.contains('hidden')) return;
+       e.preventDefault();
+       const delta = e.deltaY * -0.001;
+       zoomLevel += delta;
+       zoomLevel = Math.min(Math.max(MIN_ZOOM, zoomLevel), MAX_ZOOM);
+       updateImageTransform();
+    });
+
+    // Image Dragging Logic
+    zoomContainer.style.cursor = 'grab';
+
+    zoomContainer.addEventListener('mousedown', (e) => {
+      if (imagePreviewWrapper.classList.contains('hidden')) return;
+      e.preventDefault();
+      isDragging = true;
+      startX = e.clientX - translateX;
+      startY = e.clientY - translateY;
+      zoomContainer.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      e.preventDefault();
+      translateX = e.clientX - startX;
+      translateY = e.clientY - startY;
+      updateImageTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        zoomContainer.style.cursor = 'grab';
+      }
+    });
+
+    zoomContainer.addEventListener('dblclick', () => resetZoom());
+
+    const shouldHandleArrowNavigation = (event) => {
+      const target = event.target;
+      if (!target) return true;
+      const tag = target.tagName;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) {
+        return false;
+      }
+      if (target.isContentEditable) return false;
+      if (target.closest('.tree__group')) { // Updated class name
+        return false;
+      }
+      return true;
+    };
+
+    const navigateByOffset = (offset) => {
+      if (!filteredFiles.length) return;
+      setCurrentFile(currentIndex + offset);
+    };
+
+    window.addEventListener('keydown', (event) => {
+      if (!shouldHandleArrowNavigation(event)) return;
+      if (event.key === 'ArrowRight') {
+        navigateByOffset(1);
+        event.preventDefault();
+      } else if (event.key === 'ArrowLeft') {
+        navigateByOffset(-1);
+        event.preventDefault();
+      }
+    });
+
+    prevBtn.addEventListener('click', () => navigateByOffset(-1));
+    nextBtn.addEventListener('click', () => navigateByOffset(1));
+    toggleFullscreenBtn.addEventListener('click', () => {
+       if(!document.fullscreenElement) previewCardEl.requestFullscreen();
+       else document.exitFullscreen();
+    });
+    treeSearchInput.addEventListener('input', (e) => { treeSearchTerm = e.target.value; renderTree(); });
+    treeSearchClear.addEventListener('click', () => { treeSearchInput.value = ''; treeSearchTerm = ''; renderTree(); treeSearchClear.classList.add('hidden'); });
+    treeSearchInput.addEventListener('keyup', () => {
+       if(treeSearchInput.value) treeSearchClear.classList.remove('hidden');
+       else treeSearchClear.classList.add('hidden');
+    });
+
+    async function loadIndex() {
+      try {
+        const res = await fetch(INDEX_JSON);
+        const data = await res.json();
+        
+        let groups = [];
+        if (Array.isArray(data)) {
+           groups = [{ path: '.', categories: { images: data } }];
+        } else if (data.groups) {
+           groups = data.groups.map(g => {
+               const cats = {};
+               if (Array.isArray(g.categories)) {
+                   g.categories.forEach(c => {
+                       if (c.type && Array.isArray(c.files)) {
+                           cats[c.type] = c.files;
+                       }
+                   });
+               } else if (g.categories && typeof g.categories === 'object') {
+                   Object.assign(cats, g.categories);
+               }
+               if (Array.isArray(g.images)) {
+                   cats.images = g.images;
+               }
+               return { path: g.path || '.', categories: cats };
+           });
+        } else if (data.images) {
+           groups = [{ path: '.', categories: { images: data.images } }];
+        }
+        
+        fileGroups = groups;
+        renderCategoryFilters();
+        renderTree();
+        
+        if (filteredFiles.length > 0) {
+          setCurrentFile(0);
+        } else {
+          showPreviewPlaceholder('当前筛选没有匹配文件。');
+        }
+      } catch(e) {
+        console.error(e);
+        showPreviewPlaceholder('无法加载索引文件');
+      }
+    }
+    loadIndex();
+
+  </script>
+</body>
+</html>
