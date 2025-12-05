@@ -3,9 +3,17 @@ FROM python:3.11-slim
 ENV DEBIAN_FRONTEND=noninteractive
 
 # 切换到阿里云镜像以加速 apt 与 pip
-RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list \
-    && sed -i 's|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list \
-    && apt-get update \
+RUN set -eux; \
+    release="$(. /etc/os-release && echo "$VERSION_CODENAME")"; \
+    : "${release:=bookworm}"; \
+    cat > /etc/apt/sources.list <<EOF
+deb http://mirrors.aliyun.com/debian ${release} main contrib non-free non-free-firmware
+deb http://mirrors.aliyun.com/debian ${release}-updates main contrib non-free non-free-firmware
+deb http://mirrors.aliyun.com/debian ${release}-backports main contrib non-free non-free-firmware
+deb http://mirrors.aliyun.com/debian-security ${release}-security main contrib non-free non-free-firmware
+EOF
+
+RUN apt-get update \
     && apt-get install -y --no-install-recommends inotify-tools \
     && rm -rf /var/lib/apt/lists/*
 

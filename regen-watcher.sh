@@ -48,8 +48,8 @@ run_generate
 # 递归监听文件创建、删除和写入事件
 inotifywait -m -r \
   --event create --event delete --event moved_to --event moved_from --event close_write \
-  --format '%w%f::%e' --quiet --exclude '(^|/)\.git(/|$)' --exclude 'index\.json$' --null \
-  "$WATCH_DIR" | while IFS= read -r -d '' event; do
+  --format '%w%f::%e' --quiet --exclude '((^|/)\.git(/|$))|index\.json$' \
+  "$WATCH_DIR" | while IFS= read -r event; do
     filepath=${event%%::*}
     events=${event##*::}
 
