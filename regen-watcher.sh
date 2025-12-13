@@ -16,7 +16,7 @@ fi
 seed_default_content() {
   [[ -d "$TEMPLATE_DIR" ]] || return
 
-  local items=(assets index.html generate.py styles.css style.css)
+  local items=(assets index.html generate.py)
   for name in "${items[@]}"; do
     local src="$TEMPLATE_DIR/$name"
     local dest="$WATCH_DIR/$name"

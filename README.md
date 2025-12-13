@@ -17,8 +17,8 @@
 ├── docker-compose.yml      # 定义挂载当前目录的监控服务
 ├── regen-watcher.sh        # 监听脚本，封装 inotify + generate.py 调用
 ├── generate.py             # 已有的索引生成脚本
-├── index.html / styles.css # 示例静态文件
-└── assets/…                # 需要被索引的文件
+├── index.html              # 示例静态文件
+└── assets/…                # 静态资源（包含 styles.css 等依赖）
 ```
 
 ## 使用方式

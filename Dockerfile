@@ -24,8 +24,7 @@ WORKDIR /workspace
 RUN mkdir -p /opt/template
 
 COPY assets /opt/template/assets
-COPY index.html styles.css generate.py /opt/template/
-RUN cp /opt/template/styles.css /opt/template/style.css
+COPY index.html generate.py /opt/template/
 
 COPY regen-watcher.sh /usr/local/bin/regen-watcher.sh
 RUN chmod +x /usr/local/bin/regen-watcher.sh
