@@ -1057,6 +1057,18 @@ p { margin-bottom: 0.5rem; }
   box-sizing: border-box;
 }
 
+.markdown-wrapper .markdown-body pre {
+  overflow-x: hidden;
+}
+
+.markdown-wrapper .markdown-body pre > code,
+.markdown-wrapper .markdown-body pre code.hljs {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .markdown-wrapper {
   display: flex;
   height: 100%;
