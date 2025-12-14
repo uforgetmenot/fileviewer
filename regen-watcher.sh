@@ -5,7 +5,7 @@ WATCH_DIR=${WATCH_DIR:-/workspace}
 TARGET_DIR=${TARGET_DIR:-$WATCH_DIR}
 GENERATE_SCRIPT=${GENERATE_SCRIPT:-$WATCH_DIR/generate.py}
 TEMPLATE_DIR=${TEMPLATE_DIR:-/opt/template}
-SUPPORTED_PATTERN='\.(png|jpg|jpeg|gif|webp|md|drawio|pdf|xlsx|docx|txt|pptx)$'
+SUPPORTED_PATTERN='\.(png|jpg|jpeg|gif|webp|md|drawio|pdf|xlsx|docx|txt|pptx|mp4|webm|ogv|m4v|mp3|wav|m4a|ogg|oga|flac|aac)$'
 SITE_NAME=${SITE_NAME:-文件浏览器}
 
 if [[ ! -d "$WATCH_DIR" ]]; then

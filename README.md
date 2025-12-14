@@ -5,7 +5,7 @@
 ## 监控范围
 
 - 监听的根目录：以 `docker compose` 启动时挂载的当前工作目录（默认 `/workspace`）。
-- 受支持的扩展名：`.png`、`.jpg`、`.jpeg`、`.gif`、`.webp`、`.md`、`.drawio`、`.pdf`、`.xlsx`、`.docx`、`.txt`、`.pptx`。
+- 受支持的扩展名：`.png`、`.jpg`、`.jpeg`、`.gif`、`.webp`、`.md`、`.drawio`、`.pdf`、`.xlsx`、`.docx`、`.txt`、`.pptx`、`.mp4`、`.mp3`（以及常见 `.webm`、`.wav`、`.m4a` 等音视频格式）。
 - 忽略项：`README.md`（位于根目录时不触发）以及 `.git` 目录和自动生成的 `index.json`。
 - 触发条件：文件被创建、删除、移动到/移出目录、或写入完成时，且文件扩展名命中上述列表。
 

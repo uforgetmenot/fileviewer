@@ -14,3 +14,4 @@ yarn-error.log
 *.local
 index.json
 books
+__pycache__/

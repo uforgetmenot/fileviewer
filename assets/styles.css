@@ -620,6 +620,8 @@ p { margin-bottom: 0.5rem; }
 
 /* File Icons */
 .icon-images { color: #D97706; background: #FEF3C7; padding: 2px; border-radius: 4px; }
+.icon-video { color: #7C3AED; background: #F3E8FF; padding: 2px; border-radius: 4px; }
+.icon-audio { color: #0F766E; background: #CCFBF1; padding: 2px; border-radius: 4px; }
 .icon-markdown { color: #2563EB; background: #EFF6FF; padding: 2px; border-radius: 4px; }
 .icon-pdf { color: #DC2626; background: #FEE2E2; padding: 2px; border-radius: 4px; }
 .icon-word { color: #1D4ED8; background: #DBEAFE; padding: 2px; border-radius: 4px; }
@@ -1046,6 +1048,75 @@ p { margin-bottom: 0.5rem; }
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+
+.media-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  height: 100%;
+  padding: 1rem;
+  box-sizing: border-box;
+  min-height: 0;
+}
+
+.media-viewer--video {
+  background: #0b1220;
+}
+
+.media-viewer__video {
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  flex: 1;
+  min-height: 0;
+  object-fit: contain;
+  background: #000;
+  border-radius: 8px;
+  outline: none;
+}
+
+.media-viewer--audio {
+  background: white;
+  justify-content: center;
+}
+
+.media-viewer__audio-shell {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.media-viewer__audio {
+  width: 100%;
+}
+
+.media-viewer__hint {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.media-viewer__link {
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.media-viewer--audio .media-viewer__link {
+  color: var(--color-primary);
+}
+
+.media-viewer__link:hover {
+  text-decoration: underline;
 }
 
 /* Markdown Specifics */

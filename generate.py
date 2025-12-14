@@ -10,6 +10,8 @@ from typing import Dict, List, Optional, Tuple
 
 CATEGORY_EXTENSIONS = {
   "images": {".png", ".jpg", ".jpeg", ".gif", ".webp"},
+  "video": {".mp4", ".webm", ".ogv", ".m4v"},
+  "audio": {".mp3", ".wav", ".m4a", ".ogg", ".oga", ".flac", ".aac"},
   "markdown": {".md", ".markdown"},
   "mindmap": set(),  # handled via double-extension detection
   "drawio": {".drawio"},
