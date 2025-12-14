@@ -1653,12 +1653,30 @@
        };
 
        setStatus('正在加载 PDF ...');
-       const loadingTask = pdfjsLib.getDocument({ url: path });
+       let loadingTask = pdfjsLib.getDocument({ url: path });
        let pdfDoc = null;
        let currentPage = 1;
+       let disposed = false;
        const isTransportDestroyed = (error) => (
          Boolean(error) && typeof error.message === 'string' && error.message.includes('Transport destroyed')
        );
+       const isRetriableLoadError = (error) => {
+         const name = typeof error?.name === 'string' ? error.name : '';
+         const message = typeof error?.message === 'string' ? error.message : '';
+         if (name === 'MissingPDFException' || message.includes('Missing PDF')) return true;
+         if (name === 'UnexpectedResponseException' || message.includes('Unexpected server response')) return true;
+         if (/Failed to fetch|NetworkError/i.test(message)) return true;
+         return false;
+       };
+       const buildCacheBustedUrl = (url) => {
+         try {
+           const u = new URL(url, window.location.href);
+           u.searchParams.set('_', String(Date.now()));
+           return u.toString();
+         } catch {
+           return `${url}${url.includes('?') ? '&' : '?'}_=${Date.now()}`;
+         }
+       };
        let totalPages = 0;
        let scale = 1;
        let shouldMaintainFit = true;
@@ -1685,6 +1703,7 @@
        const MAX_SCALE = 4;
 
        disposePdfViewer = () => {
+         disposed = true;
          if (handleResize) {
            window.removeEventListener('resize', handleResize);
            handleResize = null;
@@ -1890,18 +1909,49 @@
          }
        };
 
-       try {
-         pdfDoc = await loadingTask.promise;
-       } catch (error) {
-         if (isTransportDestroyed(error)) {
+       let loadError = null;
+       for (let attempt = 0; attempt < 2; attempt++) {
+         try {
+           if (attempt === 1) {
+             setStatus('PDF 加载失败，正在重试...');
+             try {
+               if (loadingTask && typeof loadingTask.destroy === 'function') loadingTask.destroy();
+             } catch {}
+             await new Promise(resolve => setTimeout(resolve, 300));
+             if (disposed) return;
+
+             const retryUrl = buildCacheBustedUrl(path);
+             const res = await fetch(retryUrl);
+             if (disposed) return;
+             if (!res.ok) throw new Error(`Unexpected server response (${res.status}) while retrieving PDF "${path}".`);
+             const data = await res.arrayBuffer();
+             if (disposed) return;
+             loadingTask = pdfjsLib.getDocument({ data });
+           }
+           pdfDoc = await loadingTask.promise;
+           if (disposed) return;
+           loadError = null;
+           break;
+         } catch (error) {
+           if (isTransportDestroyed(error)) {
+             setStatus('');
+             endBookmarkLoading(false);
+             return;
+           }
+           loadError = error;
+           if (attempt === 0 && isRetriableLoadError(error)) continue;
            setStatus('');
            endBookmarkLoading(false);
+           cleanupPdfViewer();
+           showDocStatus(`PDF 加载失败: ${error?.message || '未知错误'}`);
            return;
          }
+       }
+       if (!pdfDoc) {
          setStatus('');
          endBookmarkLoading(false);
          cleanupPdfViewer();
-         showDocStatus(`PDF 加载失败: ${error?.message || '未知错误'}`);
+         showDocStatus(`PDF 加载失败: ${loadError?.message || '未知错误'}`);
          return;
        }
        totalPages = pdfDoc.numPages;
