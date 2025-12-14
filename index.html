@@ -376,8 +376,8 @@
         });
       });
       
-      const primaryTypes = ['markdown', 'marpit', 'pdf', 'word', 'slides'];
-      const moreTypes = ['all', ...CATEGORY_ORDER.filter(t => !primaryTypes.includes(t))];
+      const primaryTypes = ['all', 'markdown', 'marpit', 'pdf', 'word', 'slides'];
+      const moreTypes = CATEGORY_ORDER.filter(t => !primaryTypes.includes(t));
       const activeInPrimary = primaryTypes.includes(currentCategory);
       const activeInMore = !activeInPrimary;
       categoryFiltersEl.innerHTML = '';
@@ -1549,11 +1549,21 @@
     async function previewVideo(path) {
        docPreviewEl.innerHTML = `
          <div class="media-viewer media-viewer--video">
-           <video class="media-viewer__video" controls preload="metadata" playsinline></video>
+           <video class="media-viewer__video" controls controlslist="nodownload noplaybackrate noremoteplayback" disablepictureinpicture preload="metadata" playsinline></video>
          </div>`;
 
        const video = docPreviewEl.querySelector('video');
        if (!video) return;
+       try {
+         video.addEventListener('contextmenu', (event) => event.preventDefault());
+         if ('disablePictureInPicture' in video) video.disablePictureInPicture = true;
+         if ('disableRemotePlayback' in video) video.disableRemotePlayback = true;
+         if (video.controlsList && typeof video.controlsList.add === 'function') {
+           video.controlsList.add('nodownload');
+           video.controlsList.add('noplaybackrate');
+           video.controlsList.add('noremoteplayback');
+         }
+       } catch {}
        video.src = path;
     }
 
@@ -1561,12 +1571,21 @@
        docPreviewEl.innerHTML = `
          <div class="media-viewer media-viewer--audio">
            <div class="media-viewer__audio-shell">
-             <audio class="media-viewer__audio" controls preload="metadata"></audio>
+             <audio class="media-viewer__audio" controls controlslist="nodownload noplaybackrate noremoteplayback" preload="metadata"></audio>
            </div>
          </div>`;
 
        const audio = docPreviewEl.querySelector('audio');
        if (!audio) return;
+       try {
+         audio.addEventListener('contextmenu', (event) => event.preventDefault());
+         if ('disableRemotePlayback' in audio) audio.disableRemotePlayback = true;
+         if (audio.controlsList && typeof audio.controlsList.add === 'function') {
+           audio.controlsList.add('nodownload');
+           audio.controlsList.add('noplaybackrate');
+           audio.controlsList.add('noremoteplayback');
+         }
+       } catch {}
        audio.src = path;
     }
     async function previewPdf(path) {
