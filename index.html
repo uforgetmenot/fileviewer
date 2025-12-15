@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="assets/pptxjs.css" />
   <link rel="stylesheet" href="assets/nv.d3.min.css" />
   <link rel="stylesheet" href="assets/highlight-github.min.css" />
+  <link rel="stylesheet" href="assets/katex.min.css" />
   <link rel="stylesheet" href="assets/marpit-default.css" />
   <link rel="stylesheet" href="assets/github-markdown.css">
 </head>
@@ -89,6 +90,8 @@
   </main>
 
   <script src="assets/marked.min.js"></script>
+  <script src="assets/katex.min.js"></script>
+  <script src="assets/katex-auto-render.min.js"></script>
   <script src="assets/highlight.min.js"></script>
   <script src="assets/jszip.min.js"></script>
   <script src="assets/docx-preview.min.js"></script>
@@ -352,6 +355,25 @@
     }
     function escapeHtml(text) {
       return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function renderLatexInElement(root) {
+      if (!root) return;
+      if (typeof window.renderMathInElement !== 'function') return;
+      try {
+        window.renderMathInElement(root, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false },
+            { left: '\\[', right: '\\]', display: true },
+            { left: '\\(', right: '\\)', display: false },
+          ],
+          throwOnError: false,
+          errorColor: '#cc0000',
+          ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+        });
+      } catch (e) {
+        console.warn('LaTeX 渲染失败:', e);
+      }
     }
     function getCategoryLabel(type) {
       if (type === 'all') return '全部';
@@ -764,6 +786,8 @@
           </div>
         </div>
        `;
+
+       renderLatexInElement(docPreviewEl.querySelector('.markdown-body'));
        
        if (tocEntries.length > 0) {
            const sidebar = document.getElementById('mdSidebar');
@@ -2634,7 +2658,7 @@
     }
     async function previewMarpit(path) {
        const txt = await fetchText(path);
-       if(!marpitInstance) marpitInstance = new window.marpit.Marpit({ markdown: 'default' });
+       if(!marpitInstance) marpitInstance = new window.marpit.Marpit({ markdown: ['default', { html: true }] });
        const {html, css} = marpitInstance.render(txt);
        const navIcon = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>`;
        const closeIcon = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
@@ -2725,6 +2749,7 @@
          });
        }
 
+       renderLatexInElement(marpitWrapper);
        setupMarpitKeyboardNavigation(slides);
     }
 
